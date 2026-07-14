@@ -13,31 +13,35 @@ async function startNotificationConsumer() {
 
   await consumer.connect();
 
-  logger.info("Notification Consumer Connected");
+  logger.info("Notification consumer connected");
 
   await consumer.subscribe({
     topic: TOPICS.INVENTORY_UPDATED,
     fromBeginning: false,
   });
 
-  logger.info("Subscribed to inventory-updated");
+  logger.info("Notification consumer subscribed to inventory.updated");
 
   await consumer.run({
-    eachMessage: async ({ message }) => {
-      try {
-        const event = JSON.parse(message.value.toString());
+    autoCommit: false,
+    eachMessage: async ({ topic, partition, message }) => {
+      const event = JSON.parse(message.value.toString());
 
-        logger.info(`Received Event :: ${event.eventType} :: ${event.eventId}`);
+      logger.info(`Received Event :: ${event.eventType} :: ${event.eventId}`);
 
-        // Pass complete event to processor
-        await processNotification(event);
-      } catch (error) {
-        logger.error("Notification Consumer Error", error);
-      }
+      await processNotification(event);
+
+      await consumer.commitOffsets([
+        {
+          topic,
+          partition,
+          offset: String(Number(message.offset) + 1),
+        },
+      ]);
     },
   });
 
-  logger.info("Notification Consumer Started");
+  logger.info("Notification consumer started");
 }
 
 module.exports = {

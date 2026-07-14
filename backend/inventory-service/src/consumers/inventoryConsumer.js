@@ -13,31 +13,35 @@ async function startInventoryConsumer() {
 
   await consumer.connect();
 
-  logger.info("Inventory Consumer Connected");
+  logger.info("Inventory consumer connected");
 
   await consumer.subscribe({
     topic: TOPICS.ORDER_CREATED,
     fromBeginning: false,
   });
 
-  logger.info("Subscribed to orders");
+  logger.info("Inventory consumer subscribed to order.created");
 
   await consumer.run({
-    eachMessage: async ({ message }) => {
-      try {
-        const event = JSON.parse(message.value.toString());
+    autoCommit: false,
+    eachMessage: async ({ topic, partition, message }) => {
+      const event = JSON.parse(message.value.toString());
 
-        logger.info(`Received Event :: ${event.eventType} :: ${event.eventId}`);
+      logger.info(`Received Event :: ${event.eventType} :: ${event.eventId}`);
 
-        // Pass complete event (contains eventId + payload)
-        await processInventory(event);
-      } catch (error) {
-        logger.error("Inventory Consumer Error", error);
-      }
+      await processInventory(event);
+
+      await consumer.commitOffsets([
+        {
+          topic,
+          partition,
+          offset: String(Number(message.offset) + 1),
+        },
+      ]);
     },
   });
 
-  logger.info("Inventory Consumer Started");
+  logger.info("Inventory consumer started");
 }
 
 module.exports = {

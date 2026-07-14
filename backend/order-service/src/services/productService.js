@@ -33,10 +33,68 @@ async function syncProducts() {
   };
 }
 
-async function getProducts() {
-  return await Product.find().sort({
-    title: 1,
-  });
+async function getProducts(filters = {}) {
+  const page = Math.max(Number(filters.page) || 1, 1);
+  const limit = Math.min(Math.max(Number(filters.limit) || 12, 1), 100);
+  const query = buildProductQuery(filters);
+
+  const [items, total] = await Promise.all([
+    Product.find(query)
+      .sort({
+        title: 1,
+      })
+      .skip((page - 1) * limit)
+      .limit(limit),
+    Product.countDocuments(query),
+  ]);
+
+  return {
+    items,
+    page,
+    limit,
+    total,
+    totalPages: Math.max(Math.ceil(total / limit), 1),
+  };
+}
+
+function buildProductQuery({ search = "" } = {}) {
+  const query = {};
+  const normalizedSearch = String(search || "").trim();
+
+  if (normalizedSearch) {
+    query.$or = [
+      { title: { $regex: normalizedSearch, $options: "i" } },
+      { category: { $regex: normalizedSearch, $options: "i" } },
+      { brand: { $regex: normalizedSearch, $options: "i" } },
+    ];
+  }
+
+  return query;
+}
+
+async function getPublicProducts(filters = {}) {
+  const page = Math.max(Number(filters.page) || 1, 1);
+  const limit = Math.min(Math.max(Number(filters.limit) || 1000, 1), 1000);
+  const query = buildProductQuery(filters);
+
+  const [items, total] = await Promise.all([
+    Product.find(query)
+      .select("productId title category price thumbnail stock")
+      .sort({
+        title: 1,
+      })
+      .skip((page - 1) * limit)
+      .limit(limit),
+    Product.countDocuments(query),
+  ]);
+
+  return {
+    items,
+    page,
+    limit,
+    total,
+    totalPages: Math.max(Math.ceil(total / limit), 1),
+  };
 }
 
 async function getProductById(id) {
@@ -48,5 +106,6 @@ async function getProductById(id) {
 module.exports = {
   syncProducts,
   getProducts,
+  getPublicProducts,
   getProductById,
 };

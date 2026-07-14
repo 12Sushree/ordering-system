@@ -15,13 +15,25 @@ dotenv.config({
 const app = require("./app");
 const connectDB = require("../../shared/config/db");
 const { connectProducer } = require("../../shared/kafka/producer");
+const {
+  ensureDefaultUsers,
+} = require("./services/authService");
+const { flushOrderOutbox } = require("./services/orderService");
 
 async function startServer() {
   try {
     await connectDB();
     await connectProducer();
+    await ensureDefaultUsers();
+    await flushOrderOutbox();
 
     const server = http.createServer(app);
+
+    setInterval(() => {
+      flushOrderOutbox().catch((error) => {
+        console.error(`Order outbox flush failed :: ${error.message}`);
+      });
+    }, 5000);
 
     server.listen(process.env.ORDER_SERVICE_PORT, () => {
       console.log(

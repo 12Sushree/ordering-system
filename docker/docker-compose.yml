@@ -39,10 +39,20 @@ services:
   mongo:
     image: mongo:6.0
     container_name: mongo
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
     ports:
-      - "27017:27017"
+      - "27018:27017"
     volumes:
       - mongo-data:/data/db
+
+  mongo-init:
+    image: mongo:6.0
+    container_name: mongo-init
+    depends_on:
+      - mongo
+    volumes:
+      - ./mongo-init.sh:/mongo-init.sh:ro
+    entrypoint: ["bash", "/mongo-init.sh"]
 
   mongo-express:
     image: mongo-express:1.0

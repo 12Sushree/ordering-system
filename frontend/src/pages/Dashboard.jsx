@@ -1,119 +1,374 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { Box, CircularProgress, Container, Grid } from "@mui/material";
-
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CircularProgress,
+  Container,
+  Divider,
+  Grid,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-import Navbar from "../components/Navbar";
+import Navbar from "../components/NavBar";
 import AnalyticsCards from "../components/AnalyticsCard";
+import DeferredOrdersPanel from "../components/DeferredOrdersPanel";
 import ProductTable from "../components/ProductTable";
 import OrderForm from "../components/OrderForm";
 import OrdersTable from "../components/OrdersTable";
+import AdminUsersTable from "../components/AdminUsersTable";
+import PasswordField from "../components/PasswordField";
 
-import { createOrder, getOrders, getProducts } from "../api/orderApi";
+import {
+  createOrder,
+  getInventory,
+  getOrders,
+  getProducts,
+} from "../api/orderApi";
 import { getAnalytics } from "../api/analyticsApi";
+import { getServiceHealth } from "../api/healthApi";
+import { getUsers, registerAdmin as registerAdminRequest } from "../api/authApi";
+import { useAuth } from "../context/AuthContext";
+import { useRouter } from "../context/RouterContext";
+
+const SERVICE_KEYS = ["order", "inventory", "notification", "analytics"];
 
 function Dashboard() {
+  const { user, isAdmin, isSuperAdmin, logout } = useAuth();
+  const { replace } = useRouter();
+
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [inventory, setInventory] = useState({
+    items: [],
+    page: 1,
+    limit: 12,
+    total: 0,
+    totalPages: 1,
+  });
   const [analytics, setAnalytics] = useState({});
 
   const [loading, setLoading] = useState(true);
+  const [orderDataReady, setOrderDataReady] = useState(true);
+  const [healthChecked, setHealthChecked] = useState(false);
 
-  const [serviceStatus, setServiceStatus] = useState({
-    products: true,
-    orders: true,
+  const [serviceHealth, setServiceHealth] = useState({
+    order: true,
+    inventory: true,
+    notification: true,
     analytics: true,
   });
 
-  const loadDashboard = useCallback(async (showLoader = false) => {
-    if (showLoader) {
-      setLoading(true);
-    }
+  const [inventoryPage, setInventoryPage] = useState(1);
+  const [inventoryLimit, setInventoryLimit] = useState(12);
+  const [inventorySearch, setInventorySearch] = useState("");
 
-    const results = await Promise.allSettled([
-      getProducts(),
-      getOrders(),
-      getAnalytics(),
-    ]);
+  const [superUsers, setSuperUsers] = useState({
+    items: [],
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 1,
+  });
+  const [superUsersSearch, setSuperUsersSearch] = useState("");
+  const [superUsersPage, setSuperUsersPage] = useState(1);
+  const [superUsersLimit, setSuperUsersLimit] = useState(10);
+  const [superCreateLoading, setSuperCreateLoading] = useState(false);
+  const [superCreateError, setSuperCreateError] = useState("");
+  const [superCreateSuccess, setSuperCreateSuccess] = useState("");
+  const [superCreateForm, setSuperCreateForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
+  const [superActiveSection, setSuperActiveSection] = useState("create");
 
-    const [productsResult, ordersResult, analyticsResult] = results;
+  const loadDashboard = useCallback(
+    async (showLoader = false) => {
+      if (showLoader) {
+        setLoading(true);
+      }
 
-    if (productsResult.status === "fulfilled") {
-      setProducts(productsResult.value);
+      const requests = [];
 
-      setServiceStatus((prev) => ({
-        ...prev,
-        products: true,
-      }));
-    } else {
-      setProducts([]);
+      if (!isAdmin) {
+        requests.push({ key: "products", promise: getProducts() });
+      }
 
-      setServiceStatus((prev) => ({
-        ...prev,
-        products: false,
-      }));
-    }
+      requests.push({ key: "orders", promise: getOrders() });
 
-    if (ordersResult.status === "fulfilled") {
-      setOrders(ordersResult.value);
+      if (isAdmin) {
+        requests.push(
+          {
+            key: "inventory",
+            promise: getInventory({
+              page: inventoryPage,
+              limit: inventoryLimit,
+              search: inventorySearch,
+            }),
+          },
+        );
+        requests.push({ key: "analytics", promise: getAnalytics() });
+      }
 
-      setServiceStatus((prev) => ({
-        ...prev,
-        orders: true,
-      }));
-    } else {
-      setOrders([]);
+      const results = await Promise.allSettled(requests.map((request) => request.promise));
 
-      setServiceStatus((prev) => ({
-        ...prev,
-        orders: false,
-      }));
-    }
+      const unauthorizedResult = results.find(
+        (result) =>
+          result.status === "rejected" && result.reason?.response?.status === 401,
+      );
 
-    if (analyticsResult.status === "fulfilled") {
-      setAnalytics(analyticsResult.value);
+      if (unauthorizedResult) {
+        if (showLoader) {
+          setLoading(false);
+        }
 
-      setServiceStatus((prev) => ({
-        ...prev,
-        analytics: true,
-      }));
-    } else {
-      setAnalytics({});
+        handleUnauthorized();
+        return;
+      }
 
-      setServiceStatus((prev) => ({
-        ...prev,
-        analytics: false,
-      }));
-    }
+      let resultIndex = 0;
 
-    if (showLoader) {
-      setLoading(false);
-    }
+      if (!isAdmin) {
+        const nextProducts = results[resultIndex++];
+        setProducts(
+          nextProducts.status === "fulfilled"
+            ? nextProducts.value?.items || nextProducts.value || []
+            : [],
+        );
+
+        const nextOrders = results[resultIndex++];
+        setOrders(
+          nextOrders.status === "fulfilled"
+            ? nextOrders.value?.items || nextOrders.value || []
+            : [],
+        );
+        setOrderDataReady(
+          nextProducts.status === "fulfilled" && nextOrders.status === "fulfilled",
+        );
+
+        setInventory([]);
+        setAnalytics({});
+      } else {
+        setProducts([]);
+
+        const nextOrders = results[resultIndex++];
+        setOrders(
+          nextOrders.status === "fulfilled"
+            ? nextOrders.value?.items || nextOrders.value || []
+            : [],
+        );
+        setOrderDataReady(nextOrders.status === "fulfilled");
+
+        const nextInventory = results[resultIndex++];
+        const nextAnalytics = results[resultIndex++];
+
+        setInventory(
+          nextInventory.status === "fulfilled"
+            ? nextInventory.value || {
+                items: [],
+                page: inventoryPage,
+                limit: inventoryLimit,
+                total: 0,
+                totalPages: 1,
+              }
+            : {
+                items: [],
+                page: inventoryPage,
+                limit: inventoryLimit,
+                total: 0,
+                totalPages: 1,
+              },
+        );
+        setAnalytics(nextAnalytics.status === "fulfilled" ? nextAnalytics.value : {});
+      }
+
+      if (showLoader) {
+        setLoading(false);
+      }
+    },
+    [inventoryLimit, inventoryPage, inventorySearch, isAdmin],
+  );
+
+  const loadSuperAdminData = useCallback(
+    async (showLoader = false, overrides = {}) => {
+      if (showLoader) {
+        setLoading(true);
+      }
+
+      const nextPage = overrides.page ?? superUsersPage;
+      const nextLimit = overrides.limit ?? superUsersLimit;
+      const nextSearch = overrides.search ?? superUsersSearch;
+
+      try {
+        const result = await getUsers({
+          page: nextPage,
+          limit: nextLimit,
+          search: nextSearch,
+        });
+
+        setSuperUsers(result || {
+          items: [],
+          page: nextPage,
+          limit: nextLimit,
+          total: 0,
+          totalPages: 1,
+        });
+      } catch (error) {
+        setSuperCreateError(
+          error?.response?.data?.message || "Unable to load accounts",
+        );
+      } finally {
+        if (showLoader) {
+          setLoading(false);
+        }
+      }
+    },
+    [superUsersLimit, superUsersPage, superUsersSearch],
+  );
+
+  const refreshHealth = useCallback(async () => {
+    const results = await Promise.allSettled(
+      SERVICE_KEYS.map((serviceName) => getServiceHealth(serviceName)),
+    );
+
+    const nextHealth = SERVICE_KEYS.reduce((accumulator, serviceName, index) => {
+      const result = results[index];
+
+      accumulator[serviceName] =
+        result.status === "fulfilled" ? result.value.ok : false;
+
+      return accumulator;
+    }, {});
+
+    setServiceHealth(nextHealth);
+    setHealthChecked(true);
   }, []);
 
+  const handleUnauthorized = useCallback(() => {
+    logout();
+    replace("/login");
+  }, [logout, replace]);
+
+  const handleSuperCreateChange = (event) => {
+    setSuperCreateForm((prev) => ({
+      ...prev,
+      [event.target.name]: event.target.value,
+    }));
+  };
+
+  const handleSuperCreateSubmit = async (event) => {
+    event.preventDefault();
+    setSuperCreateLoading(true);
+    setSuperCreateError("");
+    setSuperCreateSuccess("");
+
+    try {
+      await registerAdminRequest(superCreateForm);
+      setSuperCreateSuccess("Admin account created successfully.");
+      setSuperCreateForm({
+        name: "",
+        email: "",
+        password: "",
+        confirmPassword: "",
+      });
+      await loadSuperAdminData(false, { page: 1 });
+    } catch (error) {
+      setSuperCreateError(
+        error?.response?.data?.message || "Unable to create admin account",
+      );
+    } finally {
+      setSuperCreateLoading(false);
+    }
+  };
+
+  const switchSuperSection = (section) => {
+    setSuperActiveSection(section);
+  };
+
   useEffect(() => {
+    if (isSuperAdmin) {
+      loadSuperAdminData(true);
+      return;
+    }
+
     loadDashboard(true);
-  }, [loadDashboard]);
+    refreshHealth();
+  }, [isSuperAdmin, loadDashboard, loadSuperAdminData, refreshHealth]);
 
   useEffect(() => {
     const interval = setInterval(() => {
+      if (isSuperAdmin) {
+        loadSuperAdminData(false);
+        return;
+      }
+
       loadDashboard(false);
-    }, 3000);
+      refreshHealth();
+    }, 5000);
 
     return () => clearInterval(interval);
-  }, [loadDashboard]);
+  }, [isSuperAdmin, loadDashboard, loadSuperAdminData, refreshHealth]);
+
+  const downServices = useMemo(
+    () =>
+      Object.entries(serviceHealth)
+        .filter(([, isHealthy]) => !isHealthy)
+        .map(([name]) => name),
+    [serviceHealth],
+  );
+
+  const orderServiceReady = serviceHealth.order && orderDataReady;
+  const hasSelectableProducts = products.length > 0;
+  const pendingOrders = useMemo(
+    () => orders.filter((order) => order.status === "PENDING"),
+    [orders],
+  );
+  const hasPendingOrders = pendingOrders.length > 0;
+  const canPlaceOrder = orderServiceReady && !hasPendingOrders;
 
   const handlePlaceOrder = async (data) => {
     try {
-      await createOrder(data);
+      const response = await createOrder(data);
+      const payload = response?.data || {};
 
-      toast.success("Order initiated successfully.");
+      if (!payload.duplicate && !payload.deferred && downServices.length === 0 && serviceHealth.order) {
+        toast.success(response?.message || "Order initiated successfully", {
+          autoClose: 3000,
+        });
+      } else if (payload.duplicate) {
+        toast.info(response?.message || "Order already exists and will be processed later.", {
+          autoClose: 3500,
+        });
+      } else if (payload.deferred || downServices.length > 0 || !serviceHealth.order) {
+        toast.warning(
+          response?.message || "Order saved. One service is down, we will process it later.",
+          {
+            autoClose: 4500,
+          },
+        );
+      }
 
-      setTimeout(() => loadDashboard(false), 3000);
+      await loadDashboard(false);
+
+      return response;
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Unable to place order");
+      if (error?.response?.status === 401) {
+        handleUnauthorized();
+        return;
+      }
+
+      const message = error?.response?.data?.message || "Unable to place order";
+      toast.error(message);
+      throw error;
     }
   };
 
@@ -132,34 +387,199 @@ function Dashboard() {
     );
   }
 
+  if (isSuperAdmin) {
+    return (
+      <>
+        <Navbar />
+
+        <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+          <Stack spacing={3}>
+            <Stack direction="row" spacing={1.5} flexWrap="wrap">
+              <Button
+                variant={superActiveSection === "create" ? "contained" : "outlined"}
+                onClick={() => switchSuperSection("create")}
+              >
+                Create Admin
+              </Button>
+
+              <Button
+                variant={superActiveSection === "accounts" ? "contained" : "outlined"}
+                onClick={() => switchSuperSection("accounts")}
+              >
+                See All Accounts
+              </Button>
+            </Stack>
+
+            {superActiveSection === "create" ? (
+              <Card elevation={4} sx={{ mb: 3 }}>
+                <CardContent sx={{ p: 4 }}>
+                  {superCreateError && (
+                    <Alert severity="error" sx={{ mb: 2 }}>
+                      {superCreateError}
+                    </Alert>
+                  )}
+
+                  {superCreateSuccess && (
+                    <Alert severity="success" sx={{ mb: 2 }}>
+                      {superCreateSuccess}
+                    </Alert>
+                  )}
+
+                  <Stack spacing={2} component="form" onSubmit={handleSuperCreateSubmit}>
+                    <TextField
+                      label="Name"
+                      name="name"
+                      value={superCreateForm.name}
+                      onChange={handleSuperCreateChange}
+                      required
+                      fullWidth
+                    />
+
+                    <TextField
+                      label="Email"
+                      name="email"
+                      type="email"
+                      value={superCreateForm.email}
+                      onChange={handleSuperCreateChange}
+                      required
+                      fullWidth
+                    />
+
+                    <PasswordField
+                      label="Password"
+                      name="password"
+                      value={superCreateForm.password}
+                      onChange={handleSuperCreateChange}
+                      required
+                      fullWidth
+                    />
+
+                    <PasswordField
+                      label="Confirm Password"
+                      name="confirmPassword"
+                      value={superCreateForm.confirmPassword}
+                      onChange={handleSuperCreateChange}
+                      required
+                      fullWidth
+                    />
+
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      size="large"
+                      disabled={superCreateLoading}
+                      sx={{ alignSelf: "flex-start" }}
+                    >
+                      {superCreateLoading ? "Creating..." : "Create admin"}
+                    </Button>
+                  </Stack>
+                </CardContent>
+              </Card>
+            ) : (
+              <AdminUsersTable
+                users={superUsers}
+                serviceAvailable
+                onSearchChange={(value) => {
+                  setSuperUsersSearch(value);
+                  setSuperUsersPage(1);
+                  loadSuperAdminData(false, {
+                    page: 1,
+                    limit: superUsersLimit,
+                    search: value,
+                  });
+                }}
+                search={superUsersSearch}
+                page={superUsers.page}
+                limit={superUsers.limit}
+                total={superUsers.total}
+                onPageChange={(page, limit) => {
+                  const nextLimit = limit || superUsersLimit;
+
+                  setSuperUsersPage(page);
+                  setSuperUsersLimit(nextLimit);
+                  loadSuperAdminData(false, {
+                    page,
+                    limit: nextLimit,
+                    search: superUsersSearch,
+                  });
+                }}
+              />
+            )}
+          </Stack>
+        </Container>
+      </>
+    );
+  }
+
   return (
     <>
       <Navbar />
 
       <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-        <AnalyticsCards
-          analytics={analytics}
-          serviceAvailable={serviceStatus.analytics}
-        />
+        <Stack spacing={2} sx={{ mb: 3 }}>
+          {!isAdmin && orderDataReady && !hasSelectableProducts && (
+            <Alert severity="info">
+              No products are currently available for ordering.
+            </Alert>
+          )}
+        </Stack>
 
-        <OrderForm
-          products={products}
-          onPlaceOrder={handlePlaceOrder}
-          serviceAvailable={serviceStatus.products && serviceStatus.orders}
-        />
+        {isAdmin && (
+          <AnalyticsCards
+            analytics={analytics}
+            serviceAvailable={serviceHealth.analytics}
+          />
+        )}
+
+        {!isAdmin && (
+          <>
+            <DeferredOrdersPanel orders={orders} />
+
+            <OrderForm
+              products={products}
+              onPlaceOrder={handlePlaceOrder}
+              serviceAvailable={canPlaceOrder}
+              userName={user?.name}
+              userEmail={user?.email}
+              blockMessage={
+                hasPendingOrders
+                  ? "You already have a pending order. Please wait until it is processed before placing another one."
+                  : null
+              }
+            />
+          </>
+        )}
 
         <Grid container spacing={2}>
-          <Grid size={{ xs: 12, lg: 6 }}>
-            <ProductTable
-              products={products}
-              serviceAvailable={serviceStatus.products}
-            />
-          </Grid>
+          {isAdmin && (
+            <Grid size={{ xs: 12, lg: 6 }}>
+              <ProductTable
+                products={inventory}
+                serviceAvailable={serviceHealth.inventory}
+                page={inventory.page}
+                rowsPerPage={inventory.limit}
+                total={inventory.total}
+                totalPages={inventory.totalPages}
+                search={inventorySearch}
+                onSearchChange={(nextSearch) => {
+                  setInventorySearch(nextSearch);
+                  setInventoryPage(1);
+                }}
+                onPageChange={(nextPage) => setInventoryPage(nextPage)}
+                onRowsPerPageChange={(nextLimit) => {
+                  setInventoryLimit(nextLimit);
+                  setInventoryPage(1);
+                }}
+              />
+            </Grid>
+          )}
 
-          <Grid size={{ xs: 12, lg: 6 }}>
+          <Grid size={{ xs: 12, lg: isAdmin ? 6 : 12 }}>
             <OrdersTable
               orders={orders}
-              serviceAvailable={serviceStatus.orders}
+              serviceAvailable={orderServiceReady}
+              title={isAdmin ? "All Orders" : "My Orders"}
+              showCustomer={isAdmin}
             />
           </Grid>
         </Grid>

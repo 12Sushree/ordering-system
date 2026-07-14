@@ -16,7 +16,17 @@ async function syncProducts(req, res, next) {
 
 async function getProducts(req, res, next) {
   try {
-    const products = await productService.getProducts();
+    const products = await productService.getProducts(req.query);
+
+    sendSuccess(res, { data: products });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getPublicProducts(req, res, next) {
+  try {
+    const products = await productService.getPublicProducts(req.query);
 
     sendSuccess(res, { data: products });
   } catch (error) {
@@ -41,5 +51,6 @@ async function getProduct(req, res, next) {
 module.exports = {
   syncProducts,
   getProducts,
+  getPublicProducts,
   getProduct,
 };

@@ -11,12 +11,35 @@ import {
   Typography,
 } from "@mui/material";
 
-function OrderForm({ products, onPlaceOrder, serviceAvailable = true }) {
+function createRequestId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function readPendingRequestId() {
+  if (typeof sessionStorage === "undefined") {
+    return createRequestId();
+  }
+
+  return sessionStorage.getItem("pendingOrderRequestId") || createRequestId();
+}
+
+function OrderForm({
+  products,
+  onPlaceOrder,
+  serviceAvailable = true,
+  userName,
+  userEmail,
+  blockMessage = null,
+}) {
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [clientRequestId, setClientRequestId] = useState(() => readPendingRequestId());
 
   const [formData, setFormData] = useState({
-    customerName: "",
-    customerEmail: "",
     productId: "",
     quantity: 1,
   });
@@ -34,26 +57,41 @@ function OrderForm({ products, onPlaceOrder, serviceAvailable = true }) {
     return Number(selectedProduct.price) * Number(formData.quantity || 0);
   }, [selectedProduct, formData.quantity]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!selectedProduct) return;
+    if (!selectedProduct || submitting) {
+      return;
+    }
 
-    onPlaceOrder({
-      ...formData,
-      productId: Number(selectedProduct.productId),
-      quantity: Number(formData.quantity),
-    });
+    setSubmitting(true);
+    if (typeof sessionStorage !== "undefined") {
+      sessionStorage.setItem("pendingOrderRequestId", clientRequestId);
+    }
 
-    setFormData({
-      customerName: "",
-      customerEmail: "",
-      productId: "",
-      quantity: 1,
-    });
+    try {
+      await onPlaceOrder({
+        productId: Number(selectedProduct.productId),
+        quantity: Number(formData.quantity),
+        clientRequestId,
+      });
 
-    setSelectedProduct(null);
+      setFormData({
+        productId: "",
+        quantity: 1,
+      });
+
+      setSelectedProduct(null);
+      if (typeof sessionStorage !== "undefined") {
+        sessionStorage.removeItem("pendingOrderRequestId");
+      }
+      setClientRequestId(createRequestId());
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  const isDisabled = !serviceAvailable || submitting;
 
   return (
     <Card elevation={4} sx={{ mb: 3 }}>
@@ -62,46 +100,28 @@ function OrderForm({ products, onPlaceOrder, serviceAvailable = true }) {
           Place Order
         </Typography>
 
-        {!serviceAvailable && (
+        <Typography variant="body2" sx={{ mb: 2, color: "text.secondary" }}>
+          Orders are placed as <strong>{userName}</strong> &lt;{userEmail}&gt;.
+        </Typography>
+
+        {blockMessage ? (
           <Alert severity="warning" sx={{ mb: 3 }}>
-            <strong>Order Service is currently unavailable.</strong>
-            <br />
-            New orders cannot be placed right now.
-            <br />
-            Other services are still working normally.
+            {blockMessage}
           </Alert>
-        )}
+        ) : !serviceAvailable ? (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            <strong>Order service is currently unavailable.</strong>
+            <br />
+            You can review existing data, but new orders cannot be submitted
+            right now.
+          </Alert>
+        ) : null}
 
         <Grid container spacing={2} component="form" onSubmit={handleSubmit}>
-          <Grid size={{ xs: 12, md: 3 }}>
-            <TextField
-              fullWidth
-              label="Customer Name"
-              name="customerName"
-              value={formData.customerName}
-              onChange={handleChange}
-              required
-              disabled={!serviceAvailable}
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 3 }}>
-            <TextField
-              fullWidth
-              label="Email"
-              type="email"
-              name="customerEmail"
-              value={formData.customerEmail}
-              onChange={handleChange}
-              required
-              disabled={!serviceAvailable}
-            />
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 3 }}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <Autocomplete
               options={products}
-              disabled={!serviceAvailable}
+              disabled={isDisabled}
               value={selectedProduct}
               onChange={(event, newValue) => {
                 setSelectedProduct(newValue);
@@ -121,7 +141,7 @@ function OrderForm({ products, onPlaceOrder, serviceAvailable = true }) {
             />
           </Grid>
 
-          <Grid size={{ xs: 12, md: 1 }}>
+          <Grid size={{ xs: 12, md: 2 }}>
             <TextField
               fullWidth
               type="number"
@@ -129,33 +149,33 @@ function OrderForm({ products, onPlaceOrder, serviceAvailable = true }) {
               name="quantity"
               value={formData.quantity}
               onChange={handleChange}
-              disabled={!serviceAvailable}
+              disabled={isDisabled}
               inputProps={{
                 min: 1,
               }}
             />
           </Grid>
 
-          <Grid size={{ xs: 12, md: 2 }}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <TextField
               fullWidth
               label="Total Price"
-              value={`₹${Number(totalPrice).toLocaleString("en-IN")}`}
+              value={`Rs. ${Number(totalPrice).toLocaleString("en-IN")}`}
               InputProps={{
                 readOnly: true,
               }}
             />
           </Grid>
 
-          <Grid size={{ xs: 12 }}>
+          <Grid size={{ xs: 12, md: 3 }}>
             <Button
               type="submit"
               variant="contained"
               size="large"
               fullWidth
-              disabled={!serviceAvailable || !selectedProduct}
+              disabled={isDisabled || !selectedProduct}
             >
-              Place Order
+              {submitting ? "Submitting..." : "Place Order"}
             </Button>
           </Grid>
         </Grid>

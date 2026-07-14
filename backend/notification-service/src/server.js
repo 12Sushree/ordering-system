@@ -13,10 +13,16 @@ const { connectProducer } = require("../../shared/kafka/producer");
 const {
   startNotificationConsumer,
 } = require("./consumers/notificationConsumer");
-const { verifyEmailConnection } = require("./services/emailService");
+const {
+  verifyEmailConnection,
+} = require("./services/emailService");
+const {
+  flushNotificationOutbox,
+} = require("./services/notificationService");
 const logger = require("../../shared/logger/logger");
 
 const PORT = process.env.NOTIFICATION_PORT || 5002;
+const OUTBOX_FLUSH_INTERVAL_MS = 5000;
 
 async function startServer() {
   try {
@@ -35,6 +41,14 @@ async function startServer() {
 
     // Start Kafka Consumer
     await startNotificationConsumer();
+
+    await flushNotificationOutbox();
+
+    setInterval(() => {
+      flushNotificationOutbox().catch((error) => {
+        logger.error(`Notification outbox flush failed :: ${error.message}`);
+      });
+    }, OUTBOX_FLUSH_INTERVAL_MS);
 
     app.listen(PORT, () => {
       logger.info(`Notification Service running on port ${PORT}`);

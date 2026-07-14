@@ -15,6 +15,21 @@ const orderSchema = new mongoose.Schema(
       lowercase: true,
     },
 
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+
+    clientRequestId: {
+      type: String,
+      required: true,
+      trim: true,
+      unique: true,
+      index: true,
+    },
+
     productId: {
       type: Number,
       required: true,
@@ -51,6 +66,31 @@ const orderSchema = new mongoose.Schema(
       default: "PENDING",
       index: true,
     },
+
+    statusHistory: {
+      type: [
+        {
+          status: {
+            type: String,
+            enum: ["PENDING", "CONFIRMED", "REJECTED"],
+            required: true,
+          },
+          note: {
+            type: String,
+            trim: true,
+          },
+          changedAt: {
+            type: Date,
+            default: Date.now,
+          },
+          changedBy: {
+            type: String,
+            trim: true,
+          },
+        },
+      ],
+      default: [],
+    },
   },
   {
     timestamps: true,
@@ -61,5 +101,6 @@ const orderSchema = new mongoose.Schema(
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ customerEmail: 1 });
 orderSchema.index({ status: 1 });
+orderSchema.index({ userId: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Order", orderSchema);

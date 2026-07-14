@@ -12,7 +12,7 @@ async function connectProducer() {
   if (!producer) {
     producer = kafka.producer({
       idempotent: true,
-      maxInFlightRequests: 5,
+      maxInFlightRequests: 1,
       retry: {
         retries: Number.MAX_SAFE_INTEGER,
       },
@@ -20,7 +20,7 @@ async function connectProducer() {
 
     await producer.connect();
 
-    logger.info("✅ Kafka Producer Connected (Idempotent Enabled)");
+    logger.info("Kafka producer connected with idempotent mode enabled");
   }
 
   return producer;
@@ -29,13 +29,13 @@ async function connectProducer() {
 /**
  * Publish Event
  */
-async function publishEvent(topic, eventType, payload) {
+async function publishEvent(topic, eventType, payload, options = {}) {
   if (!producer) {
     throw new Error("Producer is not connected.");
   }
 
   const event = {
-    eventId: generateEventId(),
+    eventId: options.eventId || generateEventId(),
     eventType,
     payload,
     createdAt: new Date().toISOString(),
@@ -47,9 +47,12 @@ async function publishEvent(topic, eventType, payload) {
 
   await producer.send({
     topic,
+    acks: -1,
     messages: [
       {
-        key: String(payload.orderId),
+        key: String(
+          options.key || payload.orderId || payload.eventId || event.eventId,
+        ),
         value: JSON.stringify(event),
       },
     ],

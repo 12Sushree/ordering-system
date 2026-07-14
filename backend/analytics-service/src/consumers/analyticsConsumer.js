@@ -13,31 +13,35 @@ async function startAnalyticsConsumer() {
 
   await consumer.connect();
 
-  logger.info("Analytics Consumer Connected");
+  logger.info("Analytics consumer connected");
 
   await consumer.subscribe({
     topic: TOPICS.INVENTORY_UPDATED,
     fromBeginning: false,
   });
 
-  logger.info("Subscribed to inventory-updated");
+  logger.info("Analytics consumer subscribed to inventory.updated");
 
   await consumer.run({
-    eachMessage: async ({ message }) => {
-      try {
-        const event = JSON.parse(message.value.toString());
+    autoCommit: false,
+    eachMessage: async ({ topic, partition, message }) => {
+      const event = JSON.parse(message.value.toString());
 
-        logger.info(`Received Event :: ${event.eventType} :: ${event.eventId}`);
+      logger.info(`Received Event :: ${event.eventType} :: ${event.eventId}`);
 
-        // Pass complete event
-        await processAnalytics(event);
-      } catch (error) {
-        logger.error("Analytics Consumer Error", error);
-      }
+      await processAnalytics(event);
+
+      await consumer.commitOffsets([
+        {
+          topic,
+          partition,
+          offset: String(Number(message.offset) + 1),
+        },
+      ]);
     },
   });
 
-  logger.info("Analytics Consumer Started");
+  logger.info("Analytics consumer started");
 }
 
 module.exports = {

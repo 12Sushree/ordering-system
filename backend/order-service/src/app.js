@@ -3,6 +3,7 @@ const cors = require("cors");
 const healthRoutes = require("./routes/healthRoute");
 const notFound = require("../../shared/middleware/notFoundMid");
 const errorHandler = require("../../shared/middleware/errorMid");
+const authRoutes = require("./routes/authRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const productRoutes = require("./routes/productRoutes");
 
@@ -18,6 +19,7 @@ app.use(
 app.use(express.json());
 
 app.use("/health", healthRoutes);
+app.use("/api/auth", authRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/products", productRoutes);
 

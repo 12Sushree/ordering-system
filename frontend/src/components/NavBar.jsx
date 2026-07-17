@@ -1,4 +1,12 @@
-import { AppBar, Avatar, Box, Button, Stack, Toolbar, Typography } from "@mui/material";
+import {
+  AppBar,
+  Avatar,
+  Box,
+  Button,
+  Stack,
+  Toolbar,
+  Typography,
+} from "@mui/material";
 
 import { useAuth } from "../context/AuthContext";
 
@@ -38,11 +46,8 @@ function Navbar() {
           </Avatar>
 
           <Box>
-            <Typography variant="h6" fontWeight={800} sx={{ lineHeight: 1.1 }}>
+            <Typography variant="h6" fontWeight={800} sx={{ lineHeight: 2.2 }}>
               Ordering System
-            </Typography>
-            <Typography variant="caption" sx={{ opacity: 0.78 }}>
-              Secure order management and admin oversight
             </Typography>
           </Box>
         </Stack>
@@ -58,14 +63,11 @@ function Navbar() {
         >
           <Box sx={{ textAlign: "right", minWidth: 0 }}>
             <Typography
-              variant="body2"
-              sx={{ color: "#fff", fontWeight: 700, lineHeight: 1.2 }}
+              variant="body1"
+              sx={{ color: "#fff", fontWeight: 500, lineHeight: 1.0 }}
               noWrap
             >
               {user?.name}
-            </Typography>
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.72)" }} noWrap>
-              {user?.email}
             </Typography>
           </Box>
 

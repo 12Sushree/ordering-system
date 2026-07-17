@@ -53,7 +53,7 @@ async function drainOutbox({ service, publishRecord }) {
           sort: {
             createdAt: 1,
           },
-          new: true,
+          returnDocument: "after",
         },
       );
 

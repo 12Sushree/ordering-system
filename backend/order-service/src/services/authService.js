@@ -8,7 +8,10 @@ const {
 } = require("../../../shared/utils/password");
 const { signToken } = require("../../../shared/utils/token");
 const ROLES = require("../../../shared/constants/roles");
-const { recordAuditLog, createNotification } = require("../../../shared/utils/activity");
+const {
+  recordAuditLog,
+  createNotification,
+} = require("../../../shared/utils/activity");
 const crypto = require("crypto");
 
 const TOKEN_TTL_SECONDS = 60 * 60 * 24;
@@ -168,7 +171,7 @@ async function ensureDefaultUsers() {
     },
     {
       upsert: true,
-      new: true,
+      returnDocument: "after",
       setDefaultsOnInsert: true,
     },
   );
@@ -193,7 +196,12 @@ function buildUserQuery({ search = "", role = "" } = {}) {
   return query;
 }
 
-async function listUsers({ page = 1, limit = 10, search = "", role = "" } = {}) {
+async function listUsers({
+  page = 1,
+  limit = 10,
+  search = "",
+  role = "",
+} = {}) {
   const nextPage = Math.max(Number(page) || 1, 1);
   const nextLimit = Math.min(Math.max(Number(limit) || 10, 1), 100);
   const query = buildUserQuery({ search, role });
@@ -277,7 +285,9 @@ async function updateUserRole({ userId, role }, actor = null) {
 }
 
 async function requestPasswordReset({ email }) {
-  const normalizedEmail = String(email || "").toLowerCase().trim();
+  const normalizedEmail = String(email || "")
+    .toLowerCase()
+    .trim();
   const user = await User.findOne({ email: normalizedEmail });
 
   if (!user) {

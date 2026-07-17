@@ -9,7 +9,7 @@ import {
 } from "@mui/material";
 
 function formatOrderLabel(order) {
-  return `${order.productTitle} x${order.quantity}`;
+  return `${order.productTitle} - ${order.quantity}`;
 }
 
 function DeferredOrdersPanel({ orders }) {
@@ -53,7 +53,7 @@ function DeferredOrdersPanel({ orders }) {
                     spacing={2}
                   >
                     <Typography fontWeight={700}>
-                      #{order._id.slice(-8)} {formatOrderLabel(order)}
+                      {formatOrderLabel(order)}
                     </Typography>
 
                     <Chip label="Waiting" color="warning" size="small" />

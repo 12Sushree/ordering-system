@@ -36,7 +36,7 @@ async function processAnalytics(event) {
         },
         {
           upsert: true,
-          new: true,
+          returnDocument: "after",
           session,
         },
       );
@@ -53,7 +53,7 @@ async function processAnalytics(event) {
         },
         {
           upsert: true,
-          new: true,
+          returnDocument: "after",
           session,
         },
       );

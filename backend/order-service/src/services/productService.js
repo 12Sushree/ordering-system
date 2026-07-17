@@ -23,7 +23,7 @@ async function syncProducts() {
       },
       {
         upsert: true,
-        new: true,
+        returnDocument: "after",
       },
     );
   }

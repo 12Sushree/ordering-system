@@ -8,11 +8,9 @@ import {
   CardContent,
   CircularProgress,
   Container,
-  Divider,
   Grid,
   Stack,
   TextField,
-  Typography,
 } from "@mui/material";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -34,7 +32,10 @@ import {
 } from "../api/orderApi";
 import { getAnalytics } from "../api/analyticsApi";
 import { getServiceHealth } from "../api/healthApi";
-import { getUsers, registerAdmin as registerAdminRequest } from "../api/authApi";
+import {
+  getUsers,
+  registerAdmin as registerAdminRequest,
+} from "../api/authApi";
 import { useAuth } from "../context/AuthContext";
 import { useRouter } from "../context/RouterContext";
 
@@ -57,6 +58,7 @@ function Dashboard() {
 
   const [loading, setLoading] = useState(true);
   const [orderDataReady, setOrderDataReady] = useState(true);
+  // eslint-disable-next-line
   const [healthChecked, setHealthChecked] = useState(false);
 
   const [serviceHealth, setServiceHealth] = useState({
@@ -91,6 +93,11 @@ function Dashboard() {
   });
   const [superActiveSection, setSuperActiveSection] = useState("create");
 
+  const handleUnauthorized = useCallback(() => {
+    logout();
+    replace("/login");
+  }, [logout, replace]);
+
   const loadDashboard = useCallback(
     async (showLoader = false) => {
       if (showLoader) {
@@ -106,24 +113,25 @@ function Dashboard() {
       requests.push({ key: "orders", promise: getOrders() });
 
       if (isAdmin) {
-        requests.push(
-          {
-            key: "inventory",
-            promise: getInventory({
-              page: inventoryPage,
-              limit: inventoryLimit,
-              search: inventorySearch,
-            }),
-          },
-        );
+        requests.push({
+          key: "inventory",
+          promise: getInventory({
+            page: inventoryPage,
+            limit: inventoryLimit,
+            search: inventorySearch,
+          }),
+        });
         requests.push({ key: "analytics", promise: getAnalytics() });
       }
 
-      const results = await Promise.allSettled(requests.map((request) => request.promise));
+      const results = await Promise.allSettled(
+        requests.map((request) => request.promise),
+      );
 
       const unauthorizedResult = results.find(
         (result) =>
-          result.status === "rejected" && result.reason?.response?.status === 401,
+          result.status === "rejected" &&
+          result.reason?.response?.status === 401,
       );
 
       if (unauthorizedResult) {
@@ -144,7 +152,7 @@ function Dashboard() {
             ? nextProducts.value?.items || nextProducts.value || []
             : [],
         );
-
+        // eslint-disable-next-line
         const nextOrders = results[resultIndex++];
         setOrders(
           nextOrders.status === "fulfilled"
@@ -152,7 +160,8 @@ function Dashboard() {
             : [],
         );
         setOrderDataReady(
-          nextProducts.status === "fulfilled" && nextOrders.status === "fulfilled",
+          nextProducts.status === "fulfilled" &&
+            nextOrders.status === "fulfilled",
         );
 
         setInventory([]);
@@ -169,6 +178,7 @@ function Dashboard() {
         setOrderDataReady(nextOrders.status === "fulfilled");
 
         const nextInventory = results[resultIndex++];
+        // eslint-disable-next-line
         const nextAnalytics = results[resultIndex++];
 
         setInventory(
@@ -188,13 +198,16 @@ function Dashboard() {
                 totalPages: 1,
               },
         );
-        setAnalytics(nextAnalytics.status === "fulfilled" ? nextAnalytics.value : {});
+        setAnalytics(
+          nextAnalytics.status === "fulfilled" ? nextAnalytics.value : {},
+        );
       }
 
       if (showLoader) {
         setLoading(false);
       }
     },
+    // eslint-disable-next-line
     [inventoryLimit, inventoryPage, inventorySearch, isAdmin],
   );
 
@@ -215,13 +228,15 @@ function Dashboard() {
           search: nextSearch,
         });
 
-        setSuperUsers(result || {
-          items: [],
-          page: nextPage,
-          limit: nextLimit,
-          total: 0,
-          totalPages: 1,
-        });
+        setSuperUsers(
+          result || {
+            items: [],
+            page: nextPage,
+            limit: nextLimit,
+            total: 0,
+            totalPages: 1,
+          },
+        );
       } catch (error) {
         setSuperCreateError(
           error?.response?.data?.message || "Unable to load accounts",
@@ -240,23 +255,21 @@ function Dashboard() {
       SERVICE_KEYS.map((serviceName) => getServiceHealth(serviceName)),
     );
 
-    const nextHealth = SERVICE_KEYS.reduce((accumulator, serviceName, index) => {
-      const result = results[index];
+    const nextHealth = SERVICE_KEYS.reduce(
+      (accumulator, serviceName, index) => {
+        const result = results[index];
 
-      accumulator[serviceName] =
-        result.status === "fulfilled" ? result.value.ok : false;
+        accumulator[serviceName] =
+          result.status === "fulfilled" ? result.value.ok : false;
 
-      return accumulator;
-    }, {});
+        return accumulator;
+      },
+      {},
+    );
 
     setServiceHealth(nextHealth);
     setHealthChecked(true);
   }, []);
-
-  const handleUnauthorized = useCallback(() => {
-    logout();
-    replace("/login");
-  }, [logout, replace]);
 
   const handleSuperCreateChange = (event) => {
     setSuperCreateForm((prev) => ({
@@ -340,17 +353,31 @@ function Dashboard() {
       const response = await createOrder(data);
       const payload = response?.data || {};
 
-      if (!payload.duplicate && !payload.deferred && downServices.length === 0 && serviceHealth.order) {
+      if (
+        !payload.duplicate &&
+        !payload.deferred &&
+        downServices.length === 0 &&
+        serviceHealth.order
+      ) {
         toast.success(response?.message || "Order initiated successfully", {
           autoClose: 3000,
         });
       } else if (payload.duplicate) {
-        toast.info(response?.message || "Order already exists and will be processed later.", {
-          autoClose: 3500,
-        });
-      } else if (payload.deferred || downServices.length > 0 || !serviceHealth.order) {
+        toast.info(
+          response?.message ||
+            "Order already exists and will be processed later.",
+          {
+            autoClose: 3500,
+          },
+        );
+      } else if (
+        payload.deferred ||
+        downServices.length > 0 ||
+        !serviceHealth.order
+      ) {
         toast.warning(
-          response?.message || "Order saved. One service is down, we will process it later.",
+          response?.message ||
+            "Order saved. One service is down, we will process it later.",
           {
             autoClose: 4500,
           },
@@ -396,14 +423,18 @@ function Dashboard() {
           <Stack spacing={3}>
             <Stack direction="row" spacing={1.5} flexWrap="wrap">
               <Button
-                variant={superActiveSection === "create" ? "contained" : "outlined"}
+                variant={
+                  superActiveSection === "create" ? "contained" : "outlined"
+                }
                 onClick={() => switchSuperSection("create")}
               >
                 Create Admin
               </Button>
 
               <Button
-                variant={superActiveSection === "accounts" ? "contained" : "outlined"}
+                variant={
+                  superActiveSection === "accounts" ? "contained" : "outlined"
+                }
                 onClick={() => switchSuperSection("accounts")}
               >
                 See All Accounts
@@ -425,7 +456,11 @@ function Dashboard() {
                     </Alert>
                   )}
 
-                  <Stack spacing={2} component="form" onSubmit={handleSuperCreateSubmit}>
+                  <Stack
+                    spacing={2}
+                    component="form"
+                    onSubmit={handleSuperCreateSubmit}
+                  >
                     <TextField
                       label="Name"
                       name="name"

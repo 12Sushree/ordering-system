@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-
 import {
   Alert,
   Box,
@@ -14,7 +13,6 @@ import {
 } from "@mui/material";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-
 import Navbar from "../components/NavBar";
 import AnalyticsCards from "../components/AnalyticsCard";
 import DeferredOrdersPanel from "../components/DeferredOrdersPanel";
@@ -23,13 +21,8 @@ import OrderForm from "../components/OrderForm";
 import OrdersTable from "../components/OrdersTable";
 import AdminUsersTable from "../components/AdminUsersTable";
 import PasswordField from "../components/PasswordField";
-
-import {
-  createOrder,
-  getInventory,
-  getOrders,
-  getProducts,
-} from "../api/orderApi";
+import { createOrder, getOrders } from "../api/orderApi";
+import { getInventory, getProducts } from "../api/inventoryApi";
 import { getAnalytics } from "../api/analyticsApi";
 import { getServiceHealth } from "../api/healthApi";
 import {
@@ -47,13 +40,7 @@ function Dashboard() {
 
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [inventory, setInventory] = useState({
-    items: [],
-    page: 1,
-    limit: 12,
-    total: 0,
-    totalPages: 1,
-  });
+  const [inventory, setInventory] = useState({ items: [] });
   const [analytics, setAnalytics] = useState({});
 
   const [loading, setLoading] = useState(true);
@@ -67,10 +54,6 @@ function Dashboard() {
     notification: true,
     analytics: true,
   });
-
-  const [inventoryPage, setInventoryPage] = useState(1);
-  const [inventoryLimit, setInventoryLimit] = useState(12);
-  const [inventorySearch, setInventorySearch] = useState("");
 
   const [superUsers, setSuperUsers] = useState({
     items: [],
@@ -115,11 +98,7 @@ function Dashboard() {
       if (isAdmin) {
         requests.push({
           key: "inventory",
-          promise: getInventory({
-            page: inventoryPage,
-            limit: inventoryLimit,
-            search: inventorySearch,
-          }),
+          promise: getInventory({ limit: 1000 }),
         });
         requests.push({ key: "analytics", promise: getAnalytics() });
       }
@@ -183,20 +162,8 @@ function Dashboard() {
 
         setInventory(
           nextInventory.status === "fulfilled"
-            ? nextInventory.value || {
-                items: [],
-                page: inventoryPage,
-                limit: inventoryLimit,
-                total: 0,
-                totalPages: 1,
-              }
-            : {
-                items: [],
-                page: inventoryPage,
-                limit: inventoryLimit,
-                total: 0,
-                totalPages: 1,
-              },
+            ? nextInventory.value || { items: [] }
+            : { items: [] },
         );
         setAnalytics(
           nextAnalytics.status === "fulfilled" ? nextAnalytics.value : {},
@@ -208,7 +175,7 @@ function Dashboard() {
       }
     },
     // eslint-disable-next-line
-    [inventoryLimit, inventoryPage, inventorySearch, isAdmin],
+    [isAdmin],
   );
 
   const loadSuperAdminData = useCallback(
@@ -259,8 +226,16 @@ function Dashboard() {
       (accumulator, serviceName, index) => {
         const result = results[index];
 
-        accumulator[serviceName] =
-          result.status === "fulfilled" ? result.value.ok : false;
+        if (result.status === "fulfilled") {
+          const response = result.value;
+
+          accumulator[serviceName] =
+            response?.ok ??
+            response?.data?.ok ??
+            response?.data?.status === "UP";
+        } else {
+          accumulator[serviceName] = false;
+        }
 
         return accumulator;
       },
@@ -268,6 +243,7 @@ function Dashboard() {
     );
 
     setServiceHealth(nextHealth);
+
     setHealthChecked(true);
   }, []);
 
@@ -549,6 +525,7 @@ function Dashboard() {
   return (
     <>
       <Navbar />
+      {console.log(serviceHealth)}
 
       <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
         <Stack spacing={2} sx={{ mb: 3 }}>
@@ -591,20 +568,6 @@ function Dashboard() {
               <ProductTable
                 products={inventory}
                 serviceAvailable={serviceHealth.inventory}
-                page={inventory.page}
-                rowsPerPage={inventory.limit}
-                total={inventory.total}
-                totalPages={inventory.totalPages}
-                search={inventorySearch}
-                onSearchChange={(nextSearch) => {
-                  setInventorySearch(nextSearch);
-                  setInventoryPage(1);
-                }}
-                onPageChange={(nextPage) => setInventoryPage(nextPage)}
-                onRowsPerPageChange={(nextLimit) => {
-                  setInventoryLimit(nextLimit);
-                  setInventoryPage(1);
-                }}
               />
             </Grid>
           )}

@@ -17,7 +17,6 @@ async function sendEmail({ to, subject, text }) {
       subject,
       text,
     });
-
     logger.info(`Email sent to ${to}`);
   } catch (error) {
     logger.error(`Failed to send email to ${to}`, error);

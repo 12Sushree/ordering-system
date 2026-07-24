@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
 import { getMe, login as loginRequest } from "../api/authApi";
+import ROLES from "../constants/roles";
 
 const AuthContext = createContext(null);
 
@@ -14,7 +15,7 @@ function readStoredSession() {
       ? (() => {
           try {
             return JSON.parse(userJson);
-          } catch (error) {
+          } catch {
             return null;
           }
         })()
@@ -36,15 +37,18 @@ export function AuthProvider({ children }) {
         return;
       }
 
+      setToken(stored.token);
+
       try {
         const me = await getMe();
 
         setUser(me);
-        setToken(stored.token);
+
         localStorage.setItem("authUser", JSON.stringify(me));
-      } catch (error) {
+      } catch {
         localStorage.removeItem("authToken");
         localStorage.removeItem("authUser");
+
         setUser(null);
         setToken(null);
       } finally {
@@ -80,7 +84,7 @@ export function AuthProvider({ children }) {
     token,
     loading,
     isAuthenticated: Boolean(user && token),
-    isAdmin: user?.role === "ADMIN",
+    isAdmin: user?.role === ROLES.ADMIN,
     isSuperAdmin: user?.isSuperAdmin === true,
     login,
     logout,

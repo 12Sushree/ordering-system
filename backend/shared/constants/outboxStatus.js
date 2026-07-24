@@ -1,0 +1,6 @@
+module.exports = {
+  PENDING: "PENDING",
+  DISPATCHING: "DISPATCHING",
+  DISPATCHED: "DISPATCHED",
+  FAILED: "FAILED",
+};

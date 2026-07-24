@@ -1,28 +1,20 @@
-const Order = require("../../../shared/models/orderModel");
-const Product = require("../../../shared/models/productModel");
+const Product = require("../models/productModel");
 const ProcessedEvent = require("../../../shared/models/processedEventModel");
 const OutboxEvent = require("../../../shared/models/outboxEventModel");
-
-const runInTransaction = require("../../../shared/utils/mongoTransaction");
-const drainOutbox = require("../../../shared/utils/outboxDispatcher");
+const { runInTransaction } = require("../../../shared/utils/mongoTransaction");
+const { drainOutbox } = require("../../../shared/utils/outboxDispatcher");
 const { publishEvent } = require("../../../shared/kafka/producer");
-const {
-  createNotification,
-  recordAuditLog,
-} = require("../../../shared/utils/activity");
-
 const TOPICS = require("../../../shared/constants/topics");
 const EVENTS = require("../../../shared/constants/events");
 const STATUS = require("../../../shared/constants/orderStatus");
-
+const SERVICES = require("../../../shared/constants/services");
 const logger = require("../../../shared/logger/logger");
-
-const SERVICE_NAME = "inventory";
 
 async function publishInventoryOutbox(record) {
   await publishEvent(record.topic, record.eventType, record.payload, {
     eventId: record.eventId,
     key: record.payload.orderId,
+    source: SERVICE_NAME,
   });
 }
 
@@ -33,15 +25,78 @@ async function flushInventoryOutbox() {
   });
 }
 
-async function processInventory(event) {
-  const { eventId, payload } = event;
-  const { orderId } = payload;
+function createHttpError(message, statusCode = 500) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+}
 
-  logger.info(`Received Event :: ${eventId} :: Order ${orderId}`);
+function validateInventoryEvent(event) {
+  if (!event) {
+    throw createHttpError("Event missing", 400);
+  }
+
+  const { eventId, eventType, payload } = event;
+  if (!eventId) {
+    throw createHttpError("Event id missing", 400);
+  }
+  if (!eventType) {
+    throw createHttpError("Event type missing", 400);
+  }
+  if (!payload) {
+    throw createHttpError("Payload missing", 400);
+  }
+
+  const {
+    orderId,
+    productId,
+    quantity,
+    userId,
+    customerName,
+    customerEmail,
+    productTitle,
+    unitPrice,
+    totalPrice,
+  } = payload;
+
+  if (!orderId || !productId || !quantity || quantity <= 0) {
+    throw createHttpError("Invalid inventory payload", 400);
+  }
+
+  return {
+    eventId,
+    eventType,
+    orderId,
+    productId,
+    quantity,
+    userId,
+    customerName,
+    customerEmail,
+    productTitle,
+    unitPrice,
+    totalPrice,
+  };
+}
+
+async function processInventory(event) {
+  const {
+    eventId,
+    eventType,
+    orderId,
+    productId,
+    quantity,
+    userId,
+    customerName,
+    customerEmail,
+    productTitle,
+    unitPrice,
+    totalPrice,
+  } = validateInventoryEvent(event);
 
   const result = await runInTransaction(async (session) => {
     const alreadyProcessed = await ProcessedEvent.findOne({
       eventId,
+      eventType,
       service: SERVICE_NAME,
     }).session(session);
 
@@ -51,49 +106,31 @@ async function processInventory(event) {
       };
     }
 
-    const order = await Order.findById(orderId).session(session);
-
-    if (!order) {
-      throw new Error(`Order Not Found : ${orderId}`);
-    }
-
-    const product = await Product.findOne({
-      productId: order.productId,
-    }).session(session);
-
-    if (!product) {
-      throw new Error("Product Not Found");
-    }
-
-    let status;
-
-    if (product.stock >= order.quantity) {
-      product.stock -= order.quantity;
-      await product.save({ session });
-
-      status = STATUS.CONFIRMED;
-    } else {
-      status = STATUS.REJECTED;
-    }
-
-    order.status = status;
-    order.statusHistory = [
-      ...(order.statusHistory || []),
+    const product = await Product.findOneAndUpdate(
       {
-        status,
-        note:
-          status === STATUS.CONFIRMED
-            ? "Inventory confirmed the order."
-            : "Inventory rejected the order due to insufficient stock.",
-        changedBy: "Inventory Service",
+        productId,
+        stock: {
+          $gte: quantity,
+        },
       },
-    ];
-    await order.save({ session });
+      {
+        $inc: {
+          stock: -quantity,
+        },
+      },
+      {
+        session,
+        new: true,
+      },
+    );
+
+    const status = product ? STATUS.CONFIRMED : STATUS.REJECTED;
 
     await ProcessedEvent.create(
       [
         {
           eventId,
+          eventType,
           service: SERVICE_NAME,
         },
       ],
@@ -105,13 +142,21 @@ async function processInventory(event) {
     await OutboxEvent.create(
       [
         {
-          eventId,
+          eventId: `${eventId}-inventory`,
           service: SERVICE_NAME,
           topic: TOPICS.INVENTORY_UPDATED,
           eventType: EVENTS.INVENTORY_UPDATED,
           payload: {
-            orderId: order._id.toString(),
+            orderId,
+            productId,
+            quantity,
             status,
+            userId,
+            customerName,
+            customerEmail,
+            productTitle,
+            unitPrice,
+            totalPrice,
           },
         },
       ],
@@ -122,64 +167,31 @@ async function processInventory(event) {
 
     return {
       duplicate: false,
+      orderId,
+      productId,
+      quantity,
       status,
-      orderId: order._id.toString(),
-      orderSnapshot: {
-        userId: order.userId,
-        customerName: order.customerName,
-        customerEmail: order.customerEmail,
-        productTitle: order.productTitle,
-      },
+      userId,
+      customerName,
+      customerEmail,
+      productTitle,
+      unitPrice,
+      totalPrice,
+      remainingStock: product?.stock ?? null,
     };
   });
 
-  if (result?.duplicate) {
-    logger.warn(`Duplicate Event Skipped :: ${eventId}`);
+  if (result.duplicate) {
+    logger.warn(`Duplicate Inventory Event Ignored :: ${eventId}`);
     return;
   }
 
   await flushInventoryOutbox();
+  logger.info(
+    `Inventory Processed :: Order=${result.orderId} :: Status=${result.status}`,
+  );
 
-  const { orderSnapshot } = result;
-
-  await recordAuditLog({
-    actor: {
-      id: orderSnapshot.userId,
-      name: orderSnapshot.customerName,
-      email: orderSnapshot.customerEmail,
-      role: "USER",
-    },
-    action: result.status === STATUS.CONFIRMED ? "ORDER_CONFIRMED" : "ORDER_REJECTED",
-    entityType: "Order",
-    entityId: result.orderId,
-    summary:
-      result.status === STATUS.CONFIRMED
-        ? `Order ${result.orderId} confirmed by inventory`
-        : `Order ${result.orderId} rejected by inventory`,
-    metadata: {
-      status: result.status,
-    },
-  });
-
-  await createNotification({
-    userId: orderSnapshot.userId,
-    audience: "USER",
-    type: result.status === STATUS.CONFIRMED ? "ORDER_CONFIRMED" : "ORDER_REJECTED",
-    title:
-      result.status === STATUS.CONFIRMED
-        ? "Order confirmed"
-        : "Order rejected",
-    message:
-      result.status === STATUS.CONFIRMED
-        ? `Your order ${orderSnapshot.productTitle} has been confirmed.`
-        : `Your order ${orderSnapshot.productTitle} was rejected due to insufficient stock.`,
-    metadata: {
-      orderId: result.orderId,
-      status: result.status,
-    },
-  });
-
-  logger.info(`Inventory Updated :: ${result.orderId} :: ${result.status}`);
+  return result;
 }
 
 module.exports = {

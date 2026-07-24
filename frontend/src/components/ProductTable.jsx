@@ -1,3 +1,5 @@
+import { useMemo, useState } from "react";
+
 import {
   Alert,
   Card,
@@ -16,18 +18,40 @@ import {
   Typography,
 } from "@mui/material";
 
-function ProductTable({
-  products,
-  serviceAvailable,
-  search,
-  onSearchChange,
-  page,
-  rowsPerPage,
-  total,
-  totalPages,
-  onPageChange,
-  onRowsPerPageChange,
-}) {
+function ProductTable({ products, serviceAvailable }) {
+  const items = products?.items || [];
+
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(12);
+
+  const filteredProducts = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+
+    if (!normalizedSearch) {
+      return items;
+    }
+
+    return items.filter((product) => {
+      const haystack = [
+        product.productId,
+        product.title,
+        product.category,
+        product.brand,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(normalizedSearch);
+    });
+  }, [items, search]);
+
+  const visibleProducts = filteredProducts.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage,
+  );
+
   const getStockChip = (stock) => {
     if (stock === 0) {
       return (
@@ -61,27 +85,42 @@ function ProductTable({
     );
   };
 
-  const items = products?.items || [];
-
   return (
     <Card elevation={4} sx={{ mb: 4 }}>
       <CardContent>
         <Stack spacing={2} sx={{ mb: 2 }}>
-          <Typography variant="h6" gutterBottom>
-            Stock Overview
-          </Typography>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+          >
+            <Typography variant="h6" fontWeight={700}>
+              Stock Overview
+            </Typography>
+
+            <Chip
+              label={`${filteredProducts.length} products`}
+              color="primary"
+              variant="outlined"
+              sx={{ fontWeight: 700 }}
+            />
+          </Stack>
 
           <TextField
             label="Search inventory"
+            placeholder="Search by product, category, brand or ID"
             size="small"
             value={search}
-            onChange={(event) => onSearchChange?.(event.target.value)}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setPage(0);
+            }}
             fullWidth
           />
         </Stack>
 
         {!serviceAvailable ? (
-          <Alert severity="warning" sx={{ mt: 2 }}>
+          <Alert severity="warning">
             <strong>Inventory service unavailable</strong>
             <br />
             Unable to fetch stock availability.
@@ -102,33 +141,30 @@ function ProductTable({
                       backgroundColor: "#0f3d66",
                       color: "#fff",
                       fontWeight: "bold",
-                      borderBottom: "none",
-                      borderRight: "none",
+                      position: "sticky",
+                      top: 0,
+                      zIndex: 2,
                     },
                   }}
                 >
                   <TableRow>
                     <TableCell>Product ID</TableCell>
-
                     <TableCell>Product</TableCell>
-
                     <TableCell align="right">Price</TableCell>
-
                     <TableCell align="center">Stock</TableCell>
-
                     <TableCell align="center">Status</TableCell>
                   </TableRow>
                 </TableHead>
 
                 <TableBody>
-                  {items.length === 0 ? (
+                  {visibleProducts.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} align="center">
-                        No products available
+                        No products found
                       </TableCell>
                     </TableRow>
                   ) : (
-                    items.map((product, index) => (
+                    visibleProducts.map((product, index) => (
                       <TableRow
                         key={product.productId}
                         hover
@@ -150,7 +186,7 @@ function ProductTable({
                         </TableCell>
 
                         <TableCell align="right">
-                          Rs. {Number(product.price).toLocaleString("en-IN")}
+                          ₹ {Number(product.price).toLocaleString("en-IN")}
                         </TableCell>
 
                         <TableCell
@@ -180,18 +216,20 @@ function ProductTable({
 
             <TablePagination
               component="div"
-              count={total || 0}
-              page={Math.max((page || 1) - 1, 0)}
-              onPageChange={(_, nextPage) => onPageChange?.(nextPage + 1)}
+              count={filteredProducts.length}
+              page={page}
+              onPageChange={(_, nextPage) => setPage(nextPage)}
               rowsPerPage={rowsPerPage}
-              onRowsPerPageChange={(event) =>
-                onRowsPerPageChange?.(Number.parseInt(event.target.value, 10))
-              }
-              rowsPerPageOptions={[5, 10, 25, 50, 100]}
+              onRowsPerPageChange={(event) => {
+                setRowsPerPage(Number.parseInt(event.target.value, 10));
+                setPage(0);
+              }}
+              rowsPerPageOptions={[5, 10, 12, 25, 50, 100]}
             />
 
             <Typography variant="caption" color="text.secondary">
-              Page {page} of {totalPages}
+              Showing {visibleProducts.length} of {filteredProducts.length}{" "}
+              products
             </Typography>
           </>
         )}

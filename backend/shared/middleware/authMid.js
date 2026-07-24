@@ -12,9 +12,19 @@ function getTokenFromHeader(req) {
   return token;
 }
 
+function ensureAuthenticated(req, res) {
+  if (!req.user) {
+    sendError(res, {
+      statusCode: 401,
+      message: "Please sign in to continue",
+    });
+    return false;
+  }
+  return true;
+}
+
 function authenticate(req, res, next) {
   const token = getTokenFromHeader(req);
-
   if (!token) {
     return sendError(res, {
       statusCode: 401,
@@ -34,27 +44,24 @@ function authenticate(req, res, next) {
     };
 
     return next();
-  } catch (error) {
+  } catch {
     return sendError(res, {
       statusCode: 401,
-      message: "Your session expired. Please sign in again.",
+      message: "Invalid or expired authentication token.",
     });
   }
 }
 
 function authorizeRoles(...roles) {
   return (req, res, next) => {
-    if (!req.user) {
-      return sendError(res, {
-        statusCode: 401,
-        message: "Please sign in to continue",
-      });
+    if (!ensureAuthenticated(req, res)) {
+      return;
     }
 
     if (!roles.includes(req.user.role)) {
       return sendError(res, {
         statusCode: 403,
-        message: "Admin access required",
+        message: "You do not have permission to perform this action.",
       });
     }
 
@@ -63,17 +70,14 @@ function authorizeRoles(...roles) {
 }
 
 function authorizeSuperAdmin(req, res, next) {
-  if (!req.user) {
-    return sendError(res, {
-      statusCode: 401,
-      message: "Please sign in to continue",
-    });
+  if (!ensureAuthenticated(req, res)) {
+    return;
   }
 
   if (!req.user.isSuperAdmin) {
     return sendError(res, {
       statusCode: 403,
-      message: "Super admin access required",
+      message: "Super Admin access required.",
     });
   }
 

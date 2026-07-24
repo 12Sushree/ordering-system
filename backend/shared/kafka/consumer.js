@@ -7,22 +7,29 @@ function createConsumer(groupId) {
   });
 }
 
-async function connectConsumer(consumer) {
+async function connectConsumer(consumer, groupId) {
   await consumer.connect();
-  logger.info("Kafka Consumer Connected");
+  logger.info(`Kafka Consumer Connected :: ${groupId}`);
 }
 
-async function subscribeTopic(consumer, topic) {
+async function disconnectConsumer(consumer, groupId) {
+  if (consumer) {
+    await consumer.disconnect();
+    logger.info(`Kafka Consumer Disconnected :: ${groupId}`);
+  }
+}
+
+async function subscribeTopic(consumer, topic, groupId) {
   await consumer.subscribe({
     topic,
     fromBeginning: false,
   });
-
-  logger.info(`Subscribed to topic: ${topic}`);
+  logger.info(`Subscribed :: ${groupId} -> ${topic}`);
 }
 
 module.exports = {
   createConsumer,
   connectConsumer,
+  disconnectConsumer,
   subscribeTopic,
 };

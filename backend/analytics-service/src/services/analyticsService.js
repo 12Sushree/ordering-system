@@ -1,21 +1,83 @@
 const Analytics = require("../models/analyticsModel");
 const ProcessedEvent = require("../../../shared/models/processedEventModel");
-const runInTransaction = require("../../../shared/utils/mongoTransaction");
-
+const { runInTransaction } = require("../../../shared/utils/mongoTransaction");
 const STATUS = require("../../../shared/constants/orderStatus");
 const logger = require("../../../shared/logger/logger");
 
-const SERVICE_NAME = "analytics";
+function createHttpError(message, statusCode = 500) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+}
+
+function validateAnalyticsEvent(event) {
+  if (!event) {
+    throw createHttpError("Event missing", 400);
+  }
+
+  const { eventId, eventType, payload } = event;
+  if (!eventId) {
+    throw createHttpError("Event id missing", 400);
+  }
+  if (!eventType) {
+    throw createHttpError("Event type missing", 400);
+  }
+  if (!payload) {
+    throw createHttpError("Payload missing", 400);
+  }
+
+  const {
+    orderId,
+    productId,
+    quantity,
+    status,
+    userId,
+    customerName,
+    customerEmail,
+    productTitle,
+    unitPrice,
+    totalPrice,
+  } = payload;
+
+  if (!orderId) {
+    throw createHttpError("Order id missing", 400);
+  }
+  if (!productId) {
+    throw createHttpError("Product id missing", 400);
+  }
+  if (!quantity || quantity <= 0) {
+    throw createHttpError("Invalid quantity", 400);
+  }
+  if (!status) {
+    throw createHttpError("Order status missing", 400);
+  }
+
+  return {
+    eventId,
+    eventType,
+    orderId,
+    productId,
+    quantity,
+    status,
+    userId,
+    customerName,
+    customerEmail,
+    productTitle,
+    unitPrice,
+    totalPrice,
+  };
+}
 
 async function processAnalytics(event) {
-  const { eventId, payload } = event;
-  const { orderId, status } = payload;
+  const { eventId, eventType, orderId, quantity, status, totalPrice } =
+    validateAnalyticsEvent(event);
 
-  logger.info(`Received Analytics Event :: ${eventId} :: Order ${orderId}`);
+  logger.info(`Received Analytics Event :: ${eventId} :: Order=${orderId}`);
 
   const result = await runInTransaction(async (session) => {
     const alreadyProcessed = await ProcessedEvent.findOne({
       eventId,
+      eventType,
       service: SERVICE_NAME,
     }).session(session);
 
@@ -25,46 +87,46 @@ async function processAnalytics(event) {
       };
     }
 
-    if (status === STATUS.CONFIRMED) {
-      await Analytics.findOneAndUpdate(
-        {},
-        {
-          $inc: {
-            totalOrders: 1,
-            confirmedOrders: 1,
+    let analytics = await Analytics.findOne({}).session(session);
+    if (!analytics) {
+      const created = await Analytics.create(
+        [
+          {
+            totalOrders: 0,
+            confirmedOrders: 0,
+            rejectedOrders: 0,
+            totalRevenue: 0,
+            totalProductsSold: 0,
+            inventoryFailures: 0,
           },
-        },
+        ],
         {
-          upsert: true,
-          returnDocument: "after",
           session,
         },
       );
-
-      logger.info(`Confirmed Order Analytics Updated :: ${orderId}`);
-    } else {
-      await Analytics.findOneAndUpdate(
-        {},
-        {
-          $inc: {
-            totalOrders: 1,
-            rejectedOrders: 1,
-          },
-        },
-        {
-          upsert: true,
-          returnDocument: "after",
-          session,
-        },
-      );
-
-      logger.info(`Rejected Order Analytics Updated :: ${orderId}`);
+      analytics = created[0];
     }
+
+    analytics.totalOrders += 1;
+
+    if (status === STATUS.CONFIRMED) {
+      analytics.confirmedOrders += 1;
+      analytics.totalRevenue += totalPrice;
+      analytics.totalProductsSold += quantity;
+    } else {
+      analytics.rejectedOrders += 1;
+      analytics.inventoryFailures += 1;
+    }
+
+    await analytics.save({
+      session,
+    });
 
     await ProcessedEvent.create(
       [
         {
           eventId,
+          eventType,
           service: SERVICE_NAME,
         },
       ],
@@ -75,15 +137,29 @@ async function processAnalytics(event) {
 
     return {
       duplicate: false,
+      orderId,
+      status,
+      totalOrders: analytics.totalOrders,
+      confirmedOrders: analytics.confirmedOrders,
+      rejectedOrders: analytics.rejectedOrders,
+      totalRevenue: analytics.totalRevenue,
+      totalProductsSold: analytics.totalProductsSold,
+      inventoryFailures: analytics.inventoryFailures,
     };
   });
 
-  if (result?.duplicate) {
-    logger.warn(`Duplicate Analytics Event Skipped :: ${eventId}`);
+  if (result.duplicate) {
+    logger.warn(`Duplicate Analytics Event Ignored :: ${eventId}`);
     return;
   }
 
-  logger.info(`Analytics Event Saved :: ${eventId}`);
+  logger.info(
+    `Analytics Updated :: Order=${result.orderId} :: Status=${result.status}`,
+  );
+
+  logger.info(
+    `Dashboard :: Orders=${result.totalOrders} | Confirmed=${result.confirmedOrders} | Rejected=${result.rejectedOrders} | Revenue=${result.totalRevenue}`,
+  );
 }
 
 module.exports = {

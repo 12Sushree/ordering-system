@@ -1,42 +1,42 @@
 const kafka = require("./kafkaClient");
 const logger = require("../logger/logger");
-const generateEventId = require("../utils/generateEventId");
+const { generateEventId } = require("../utils/generateEventId");
 
 let producer;
 
-/**
- * Connect Kafka Producer
- * Idempotent Producer Enabled
- */
 async function connectProducer() {
   if (!producer) {
     producer = kafka.producer({
       idempotent: true,
       maxInFlightRequests: 1,
       retry: {
-        retries: Number.MAX_SAFE_INTEGER,
+        retries: 10,
       },
     });
 
     await producer.connect();
-
-    logger.info("Kafka producer connected with idempotent mode enabled");
+    logger.info("Kafka producer connected.");
   }
-
   return producer;
 }
 
-/**
- * Publish Event
- */
+async function disconnectProducer() {
+  if (producer) {
+    await producer.disconnect();
+    producer = null;
+    logger.info("Kafka producer disconnected.");
+  }
+}
+
 async function publishEvent(topic, eventType, payload, options = {}) {
   if (!producer) {
-    throw new Error("Producer is not connected.");
+    throw new Error("Kafka producer is not connected.");
   }
 
   const event = {
     eventId: options.eventId || generateEventId(),
     eventType,
+    source: options.source || "UNKNOWN_SERVICE",
     payload,
     createdAt: new Date().toISOString(),
   };
@@ -57,11 +57,13 @@ async function publishEvent(topic, eventType, payload, options = {}) {
       },
     ],
   });
-
   logger.info(`Event Published Successfully :: ${event.eventId}`);
+
+  return event;
 }
 
 module.exports = {
   connectProducer,
+  disconnectProducer,
   publishEvent,
 };

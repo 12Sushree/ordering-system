@@ -1,96 +1,180 @@
 const ProcessedEvent = require("../../../shared/models/processedEventModel");
-const Order = require("../../../shared/models/orderModel");
 const OutboxEvent = require("../../../shared/models/outboxEventModel");
-const runInTransaction = require("../../../shared/utils/mongoTransaction");
-const drainOutbox = require("../../../shared/utils/outboxDispatcher");
+const { runInTransaction } = require("../../../shared/utils/mongoTransaction");
+const { drainOutbox } = require("../../../shared/utils/outboxDispatcher");
 const { sendEmail } = require("./emailService");
-
+const SERVICES = require("../../../shared/constants/services");
+const STATUS = require("../../../shared/constants/orderStatus");
 const logger = require("../../../shared/logger/logger");
 
-const SERVICE_NAME = "notification";
+function createHttpError(message, statusCode = 500) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+}
 
-function buildOrderEmail(order, status) {
-  if (!order?.customerEmail || !order?.customerName || !order?.productTitle) {
-    return null;
+function validateNotificationEvent(event) {
+  if (!event) {
+    throw createHttpError("Event missing", 400);
   }
 
-  if (status === "CONFIRMED") {
+  const { eventId, eventType, payload } = event;
+  if (!eventId) {
+    throw createHttpError("Event id missing", 400);
+  }
+  if (!eventType) {
+    throw createHttpError("Event type missing", 400);
+  }
+  if (!payload) {
+    throw createHttpError("Payload missing", 400);
+  }
+
+  const {
+    orderId,
+    productId,
+    quantity,
+    status,
+    userId,
+    customerName,
+    customerEmail,
+    productTitle,
+    unitPrice,
+    totalPrice,
+  } = payload;
+
+  if (!orderId) {
+    throw createHttpError("Order id missing", 400);
+  }
+  if (!productId) {
+    throw createHttpError("Product id missing", 400);
+  }
+  if (!quantity || quantity <= 0) {
+    throw createHttpError("Invalid quantity", 400);
+  }
+  if (!status) {
+    throw createHttpError("Order status missing", 400);
+  }
+  if (!customerEmail) {
+    throw createHttpError("Customer email missing", 400);
+  }
+
+  return {
+    eventId,
+    eventType,
+    orderId,
+    productId,
+    quantity,
+    status,
+    userId,
+    customerName,
+    customerEmail,
+    productTitle,
+    unitPrice,
+    totalPrice,
+  };
+}
+
+function buildOrderEmail(data) {
+  const {
+    customerName,
+    customerEmail,
+    productTitle,
+    quantity,
+    totalPrice,
+    status,
+  } = data;
+
+  if (status === STATUS.CONFIRMED) {
     return {
-      to: order.customerEmail,
+      to: customerEmail,
       subject: "Your order has been confirmed",
       text: [
-        `Hello ${order.customerName},`,
+        `Hello ${customerName},`,
         "",
-        `Good news! Your order for "${order.productTitle}" has been confirmed.`,
-        `Quantity: ${order.quantity}`,
+        "Your order has been confirmed successfully.",
         "",
-        "Thank you for ordering with us.",
+        `Product : ${productTitle}`,
+        `Quantity: ${quantity}`,
+        `Amount  : ₹${totalPrice}`,
+        "",
+        "Thank you for shopping with us.",
       ].join("\n"),
     };
   }
 
-  if (status === "REJECTED") {
+  if (status === STATUS.REJECTED) {
     return {
-      to: order.customerEmail,
-      subject: "Your order has been rejected",
+      to: customerEmail,
+      subject: "Your order could not be fulfilled",
       text: [
-        `Hello ${order.customerName},`,
+        `Hello ${customerName},`,
         "",
-        `Your order for "${order.productTitle}" was rejected due to insufficient stock.`,
-        `Quantity: ${order.quantity}`,
+        `Unfortunately your order for "${productTitle}" could not be fulfilled due to insufficient stock.`,
         "",
-        "You can try again once the item is back in stock.",
+        `Quantity: ${quantity}`,
+        "",
+        "Please try again later.",
       ].join("\n"),
     };
   }
-
   return null;
+}
+
+async function publishNotification(record) {
+  const emailPayload = buildOrderEmail(record.payload);
+  if (!emailPayload) {
+    logger.warn(`Unsupported notification payload :: ${record.eventId}`);
+    return;
+  }
+
+  logger.info("=======================================");
+  logger.info("Sending Notification");
+  logger.info(`Order ID : ${record.payload.orderId}`);
+  logger.info(`Status   : ${record.payload.status}`);
+  logger.info(`Email    : ${emailPayload.to}`);
+  logger.info(`Event ID : ${record.eventId}`);
+  logger.info("=======================================");
+
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    logger.warn(
+      "Email credentials are not configured. Email dispatch skipped.",
+    );
+    return;
+  }
+
+  await sendEmail(emailPayload);
 }
 
 async function flushNotificationOutbox() {
   await drainOutbox({
     service: SERVICE_NAME,
     publishRecord: async (record) => {
-      const { orderId, status } = record.payload;
-      const order = await Order.findById(orderId).lean();
-
-      logger.info("=======================================");
-      logger.info("Sending notification");
-      logger.info(`Order ID : ${orderId}`);
-      logger.info(`Status   : ${status}`);
-      logger.info(`Event ID : ${record.eventId}`);
-      logger.info("=======================================");
-
-      const emailPayload = buildOrderEmail(order, status);
-
-      if (!emailPayload) {
-        logger.warn(
-          `Skipping email for order ${orderId} because the payload is incomplete or status is unsupported.`,
-        );
-        return;
-      }
-
-      if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-        logger.warn(
-          `Email credentials are missing; skipping email for order ${orderId}.`,
-        );
-        return;
-      }
-
-      await sendEmail(emailPayload);
+      await publishNotification(record);
     },
   });
 }
 
 async function processNotification(event) {
-  const { eventId, payload } = event;
-  const { orderId, status } = payload;
-
-  logger.info(`Received Notification Event :: ${eventId} :: Order ${orderId}`);
+  const {
+    eventId,
+    eventType,
+    orderId,
+    productId,
+    quantity,
+    status,
+    userId,
+    customerName,
+    customerEmail,
+    productTitle,
+    unitPrice,
+    totalPrice,
+  } = validateNotificationEvent(event);
+  logger.info(`Received Notification Event :: ${eventId} :: Order=${orderId}`);
 
   const result = await runInTransaction(async (session) => {
     const alreadyProcessed = await ProcessedEvent.findOne({
       eventId,
+      eventType,
       service: SERVICE_NAME,
     }).session(session);
 
@@ -104,6 +188,7 @@ async function processNotification(event) {
       [
         {
           eventId,
+          eventType,
           service: SERVICE_NAME,
         },
       ],
@@ -117,11 +202,19 @@ async function processNotification(event) {
         {
           eventId,
           service: SERVICE_NAME,
-          topic: "notification",
-          eventType: "NOTIFICATION_DISPATCH",
+          topic: "internal.notification",
+          eventType: "EMAIL_NOTIFICATION",
           payload: {
             orderId,
+            productId,
+            quantity,
             status,
+            userId,
+            customerName,
+            customerEmail,
+            productTitle,
+            unitPrice,
+            totalPrice,
           },
         },
       ],
@@ -132,17 +225,21 @@ async function processNotification(event) {
 
     return {
       duplicate: false,
+      orderId,
+      status,
+      customerEmail,
     };
   });
 
-  if (result?.duplicate) {
-    logger.warn(`Duplicate Notification Event Skipped :: ${eventId}`);
+  if (result.duplicate) {
+    logger.warn(`Duplicate Notification Event Ignored :: ${eventId}`);
     return;
   }
 
   await flushNotificationOutbox();
-
-  logger.info(`Notification Event Saved :: ${eventId}`);
+  logger.info(
+    `Notification Processed :: Order=${result.orderId} :: Status=${result.status} :: Email=${result.customerEmail}`,
+  );
 }
 
 module.exports = {

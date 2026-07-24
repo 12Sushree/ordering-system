@@ -4,10 +4,9 @@ const KEY_LENGTH = 64;
 
 function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString("hex");
-  const derivedKey = crypto.scryptSync(password, salt, KEY_LENGTH).toString(
-    "hex",
-  );
-
+  const derivedKey = crypto
+    .scryptSync(password, salt, KEY_LENGTH)
+    .toString("hex");
   return `${salt}:${derivedKey}`;
 }
 
@@ -17,7 +16,6 @@ function verifyPassword(password, storedHash) {
   }
 
   const [salt, hash] = storedHash.split(":");
-
   if (!salt || !hash) {
     return false;
   }

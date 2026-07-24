@@ -5,65 +5,49 @@ const outboxEventSchema = new mongoose.Schema(
     eventId: {
       type: String,
       required: true,
-      trim: true,
     },
 
     service: {
       type: String,
       required: true,
-      trim: true,
     },
 
     topic: {
       type: String,
       required: true,
-      trim: true,
     },
 
     eventType: {
       type: String,
       required: true,
-      trim: true,
     },
 
     payload: {
-      type: mongoose.Schema.Types.Mixed,
+      type: Object,
       required: true,
     },
 
     status: {
       type: String,
-      enum: ["PENDING", "DISPATCHING", "DISPATCHED"],
+      enum: ["PENDING", "DISPATCHING", "DISPATCHED", "FAILED"],
       default: "PENDING",
-      index: true,
     },
 
     attempts: {
       type: Number,
       default: 0,
-      min: 0,
     },
 
-    lastError: {
-      type: String,
-      default: null,
-    },
-
-    lockedAt: {
-      type: Date,
-      default: null,
-    },
-
-    dispatchedAt: {
-      type: Date,
-      default: null,
-    },
+    lockedAt: Date,
 
     nextAttemptAt: {
       type: Date,
       default: Date.now,
-      index: true,
     },
+
+    lastError: String,
+
+    dispatchedAt: Date,
   },
   {
     timestamps: true,
@@ -79,12 +63,5 @@ outboxEventSchema.index(
     unique: true,
   },
 );
-
-outboxEventSchema.index({
-  service: 1,
-  status: 1,
-  nextAttemptAt: 1,
-  createdAt: 1,
-});
 
 module.exports = mongoose.model("OutboxEvent", outboxEventSchema);

@@ -1,49 +1,74 @@
-const kafka = require("../../../shared/kafka/kafkaClient");
+const {
+  createConsumer,
+  connectConsumer,
+  subscribeTopic,
+} = require("../../../shared/kafka/consumer");
 const logger = require("../../../shared/logger/logger");
 const TOPICS = require("../../../shared/constants/topics");
-
 const { processInventory } = require("../services/inventoryService");
 
 let consumer;
 
 async function startInventoryConsumer() {
-  consumer = kafka.consumer({
-    groupId: process.env.GROUP_ID,
-  });
-
-  await consumer.connect();
-
+  consumer = createConsumer(process.env.GROUP_ID);
+  await connectConsumer(consumer);
   logger.info("Inventory consumer connected");
 
-  await consumer.subscribe({
-    topic: TOPICS.ORDER_CREATED,
-    fromBeginning: false,
-  });
-
-  logger.info("Inventory consumer subscribed to order.created");
+  await subscribeTopic(consumer, TOPICS.ORDER_CREATED, process.env.GROUP_ID);
 
   await consumer.run({
     autoCommit: false,
     eachMessage: async ({ topic, partition, message }) => {
-      const event = JSON.parse(message.value.toString());
+      const offset = message.offset;
+      let event;
+      try {
+        event = JSON.parse(message.value.toString());
+      } catch (error) {
+        logger.error(
+          `Invalid Kafka message :: partition=${partition} offset=${offset}`,
+        );
+        await commitOffset(topic, partition, offset);
+        return;
+      }
 
-      logger.info(`Received Event :: ${event.eventType} :: ${event.eventId}`);
+      try {
+        logger.info(
+          `Inventory Event Received :: type=${event.eventType} eventId=${event.eventId} partition=${partition} offset=${offset}`,
+        );
 
-      await processInventory(event);
+        await processInventory(event);
 
-      await consumer.commitOffsets([
-        {
-          topic,
-          partition,
-          offset: String(Number(message.offset) + 1),
-        },
-      ]);
+        await commitOffset(topic, partition, offset);
+        logger.info(`Inventory Offset Committed :: ${event.eventId}`);
+      } catch (error) {
+        logger.error(
+          `Inventory Processing Failed :: event=${event.eventId} error=${error.message}`,
+        );
+      }
     },
   });
-
   logger.info("Inventory consumer started");
+}
+
+async function commitOffset(topic, partition, offset) {
+  await consumer.commitOffsets([
+    {
+      topic,
+      partition,
+      offset: String(Number(offset) + 1),
+    },
+  ]);
+}
+
+async function stopInventoryConsumer() {
+  if (!consumer) {
+    return;
+  }
+  await consumer.disconnect();
+  logger.info("Inventory consumer stopped");
 }
 
 module.exports = {
   startInventoryConsumer,
+  stopInventoryConsumer,
 };

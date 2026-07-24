@@ -5,13 +5,16 @@ const processedEventSchema = new mongoose.Schema(
     eventId: {
       type: String,
       required: true,
-      trim: true,
+    },
+
+    eventType: {
+      type: String,
+      required: true,
     },
 
     service: {
       type: String,
       required: true,
-      trim: true,
     },
   },
   {
@@ -19,10 +22,10 @@ const processedEventSchema = new mongoose.Schema(
   },
 );
 
-// Prevent duplicate processing by the same service
 processedEventSchema.index(
   {
     eventId: 1,
+    eventType: 1,
     service: 1,
   },
   {

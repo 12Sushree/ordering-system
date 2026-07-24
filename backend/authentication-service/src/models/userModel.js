@@ -1,7 +1,6 @@
 const mongoose = require("mongoose");
-
 const { hashPassword, verifyPassword } = require("../utils/password");
-const ROLES = require("../constants/roles");
+const ROLES = require("../../../shared/constants/roles");
 
 const userSchema = new mongoose.Schema(
   {
@@ -17,7 +16,7 @@ const userSchema = new mongoose.Schema(
       unique: true,
       trim: true,
       lowercase: true,
-      index: true,
+      match: /^\S+@\S+\.\S+$/,
     },
 
     passwordHash: {
@@ -47,16 +46,13 @@ const userSchema = new mongoose.Schema(
 userSchema.methods.setPassword = function setPassword(password) {
   this.passwordHash = hashPassword(password);
 };
-
 userSchema.methods.verifyPassword = function verifyUserPassword(password) {
   return verifyPassword(password, this.passwordHash);
 };
-
 userSchema.methods.toJSON = function toJSON() {
   const user = this.toObject();
-
   delete user.passwordHash;
-
+  delete user.__v;
   return user;
 };
 

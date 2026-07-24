@@ -10,6 +10,9 @@ async function getAnalytics(req, res, next) {
         totalOrders: 0,
         confirmedOrders: 0,
         rejectedOrders: 0,
+        totalRevenue: 0,
+        totalProductsSold: 0,
+        inventoryFailures: 0,
       },
     });
   } catch (error) {

@@ -1,28 +1,20 @@
-const { sendSuccess, sendError } = require("../../../shared/utils/response");
+const { sendSuccess } = require("../../../shared/utils/response");
 const orderService = require("../services/orderService");
 
-async function getOrders(req, res) {
+async function createOrder(req, res, next) {
   try {
-    const orders = await orderService.getAllOrders(req.user, req.query);
+    const { order, deferred, duplicate } = await orderService.createOrder(
+      req.body,
+      req.user,
+    );
 
-    return sendSuccess(res, { data: orders });
-  } catch (error) {
-    return sendError(res, {
-      statusCode: 500,
-      message: "Unable to load your order history right now",
-    });
-  }
-}
+    let message = "Order initiated successfully";
 
-async function createOrder(req, res) {
-  try {
-    const result = await orderService.createOrder(req.body, req.user);
-    const { order, deferred, duplicate } = result;
-    const message = deferred
-      ? "Order saved. One service is down, we will process it later."
-      : duplicate
-        ? "Order already saved. We will process it later."
-        : "Order initiated successfully";
+    if (duplicate) {
+      message = "Order already exists. We will continue processing it.";
+    } else if (deferred) {
+      message = "Order saved. Processing will continue automatically.";
+    }
 
     return sendSuccess(res, {
       statusCode: duplicate ? 200 : 201,
@@ -34,24 +26,18 @@ async function createOrder(req, res) {
       },
     });
   } catch (error) {
-    if (
-      error.message === "Product not found" ||
-      error.message === "Quantity must be greater than zero" ||
-      error.message === "Missing client request id"
-    ) {
-      return sendError(res, {
-        statusCode: error.message === "Product not found" ? 404 : 400,
-        message:
-          error.message === "Missing client request id"
-            ? "Retry the request from the form. The order request id was missing."
-            : error.message,
-      });
-    }
+    next(error);
+  }
+}
 
-    return sendError(res, {
-      statusCode: 500,
-      message: "Unable to save your order right now",
+async function getOrders(req, res, next) {
+  try {
+    const orders = await orderService.getAllOrders(req.user, req.query);
+    return sendSuccess(res, {
+      data: orders,
     });
+  } catch (error) {
+    next(error);
   }
 }
 

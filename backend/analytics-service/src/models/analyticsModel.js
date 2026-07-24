@@ -16,6 +16,21 @@ const analyticsSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+
+    totalRevenue: {
+      type: Number,
+      default: 0,
+    },
+
+    totalProductsSold: {
+      type: Number,
+      default: 0,
+    },
+
+    inventoryFailures: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,

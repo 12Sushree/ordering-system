@@ -1,10 +1,18 @@
+const logger = require("../logger/logger");
 const { sendError } = require("../utils/response");
 
 function errorHandler(err, req, res, next) {
-  console.error(err);
-  sendError(res, {
-    statusCode: err.statusCode || err.status || 500,
-    message: err.message,
+  logger.error(err.stack || err.message || err);
+
+  const statusCode = err.statusCode || err.status || 500;
+  const message =
+    statusCode >= 500
+      ? "Internal Server Error"
+      : err.message || "Something went wrong";
+
+  return sendError(res, {
+    statusCode,
+    message,
   });
 }
 

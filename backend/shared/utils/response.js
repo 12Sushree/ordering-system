@@ -1,23 +1,23 @@
 const sendSuccess = (
   res,
-  { statusCode = 200, message = "Success", data = null } = {},
+  { statusCode = 200, message = "Success", data } = {},
 ) => {
-  return res.status(statusCode).json({
-    success: true,
-    message,
-    data,
-  });
+  const response = { success: true, message };
+  if (data !== undefined) {
+    response.data = data;
+  }
+  return res.status(statusCode).json(response);
 };
 
 const sendError = (
   res,
-  { statusCode = 500, message = "Something went wrong", errors = null } = {},
+  { statusCode = 500, message = "Something went wrong", errors } = {},
 ) => {
-  return res.status(statusCode).json({
-    success: false,
-    message,
-    errors,
-  });
+  const response = { success: false, message };
+  if (errors !== undefined) {
+    response.errors = errors;
+  }
+  return res.status(statusCode).json(response);
 };
 
 module.exports = {

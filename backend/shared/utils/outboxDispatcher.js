@@ -1,23 +1,22 @@
 const OutboxEvent = require("../models/outboxEventModel");
 const logger = require("../logger/logger");
+const OUTBOX_STATUS = require("../constants/outboxStatus");
 
 const DEFAULT_RETRY_DELAY_MS = 5000;
 const STALE_LOCK_MS = 60000;
-
-let draining = false;
+const MAX_RETRIES = 10;
+const activeDispatchers = new Set();
 
 function getRetryDelayMs(attempts) {
   const retryCount = Math.max(0, attempts - 1);
-
   return Math.min(DEFAULT_RETRY_DELAY_MS * 2 ** retryCount, 60000);
 }
 
 async function drainOutbox({ service, publishRecord }) {
-  if (draining) {
+  if (activeDispatchers.has(service)) {
     return;
   }
-
-  draining = true;
+  activeDispatchers.add(service);
 
   try {
     while (true) {
@@ -32,10 +31,10 @@ async function drainOutbox({ service, publishRecord }) {
           },
           $or: [
             {
-              status: "PENDING",
+              status: OUTBOX_STATUS.PENDING,
             },
             {
-              status: "DISPATCHING",
+              status: OUTBOX_STATUS.DISPATCHING,
               lockedAt: {
                 $lte: staleBefore,
               },
@@ -44,7 +43,7 @@ async function drainOutbox({ service, publishRecord }) {
         },
         {
           $set: {
-            status: "DISPATCHING",
+            status: OUTBOX_STATUS.DISPATCHING,
             lockedAt: now,
             lastError: null,
           },
@@ -63,26 +62,46 @@ async function drainOutbox({ service, publishRecord }) {
 
       try {
         await publishRecord(record);
-
         await OutboxEvent.updateOne(
           {
             _id: record._id,
           },
           {
             $set: {
-              status: "DISPATCHED",
+              status: OUTBOX_STATUS.DISPATCHED,
               dispatchedAt: new Date(),
               lockedAt: null,
               lastError: null,
             },
           },
         );
-
         logger.info(
           `Outbox event dispatched :: ${record.service} :: ${record.eventType} :: ${record.eventId}`,
         );
       } catch (error) {
         const attempts = (record.attempts || 0) + 1;
+        if (attempts >= MAX_RETRIES) {
+          await OutboxEvent.updateOne(
+            {
+              _id: record._id,
+            },
+            {
+              $set: {
+                status: OUTBOX_STATUS.FAILED,
+                lockedAt: null,
+                lastError: error.message,
+              },
+              $inc: {
+                attempts: 1,
+              },
+            },
+          );
+          logger.error(
+            `Outbox permanently failed :: ${record.service} :: ${record.eventType} :: ${record.eventId} :: ${error.message}`,
+          );
+          continue;
+        }
+
         const nextAttemptAt = new Date(Date.now() + getRetryDelayMs(attempts));
 
         await OutboxEvent.updateOne(
@@ -91,7 +110,7 @@ async function drainOutbox({ service, publishRecord }) {
           },
           {
             $set: {
-              status: "PENDING",
+              status: OUTBOX_STATUS.PENDING,
               lockedAt: null,
               lastError: error.message,
               nextAttemptAt,
@@ -103,15 +122,16 @@ async function drainOutbox({ service, publishRecord }) {
         );
 
         logger.error(
-          `Outbox dispatch failed :: ${record.service} :: ${record.eventType} :: ${record.eventId} :: ${error.message}`,
+          `Outbox dispatch failed :: ${record.service} :: ${record.eventType} :: ${record.eventId} :: Attempt ${attempts}/${MAX_RETRIES} :: ${error.message}`,
         );
-
         return;
       }
     }
   } finally {
-    draining = false;
+    activeDispatchers.delete(service);
   }
 }
 
-module.exports = drainOutbox;
+module.exports = {
+  drainOutbox,
+};

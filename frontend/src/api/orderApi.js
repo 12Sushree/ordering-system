@@ -1,21 +1,15 @@
-import api from "./axios";
+import createApiClient from "./createApiClient";
 
-export const getProducts = async (params = {}) => {
-  const response = await api.get("/products/public", { params });
-  return response.data.data;
-};
-
-export const getInventory = async (params = {}) => {
-  const response = await api.get("/products", { params });
-  return response.data.data;
-};
+const orderApi = createApiClient(import.meta.env.VITE_ORDER_API);
 
 export const createOrder = async (payload) => {
-  const response = await api.post("/orders", payload);
-  return response.data;
+  const { data } = await orderApi.post("/orders", payload);
+  return data;
 };
 
 export const getOrders = async (params = {}) => {
-  const response = await api.get("/orders", { params });
-  return response.data.data;
+  const { data } = await orderApi.get("/orders", {
+    params,
+  });
+  return data.data;
 };

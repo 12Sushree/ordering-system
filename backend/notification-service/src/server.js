@@ -7,18 +7,17 @@ require("dotenv").config({
   path: path.join(__dirname, "../.env"),
 });
 
+const SERVICES = require("../../shared/constants/services");
+global.SERVICE_NAME = SERVICES.NOTIFICATION_SERVICE;
+
 const app = require("./app");
 const connectDB = require("../../shared/config/db");
 const { connectProducer } = require("../../shared/kafka/producer");
 const {
   startNotificationConsumer,
 } = require("./consumers/notificationConsumer");
-const {
-  verifyEmailConnection,
-} = require("./services/emailService");
-const {
-  flushNotificationOutbox,
-} = require("./services/notificationService");
+const { verifyEmailConnection } = require("./services/emailService");
+const { flushNotificationOutbox } = require("./services/notificationService");
 const logger = require("../../shared/logger/logger");
 
 const PORT = process.env.NOTIFICATION_PORT || 5002;
@@ -26,22 +25,16 @@ const OUTBOX_FLUSH_INTERVAL_MS = 5000;
 
 async function startServer() {
   try {
-    // Connect MongoDB
     await connectDB();
-
-    // Connect Kafka Producer
     await connectProducer();
 
-    // Verify Email Service only if credentials provided
     if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
       await verifyEmailConnection();
     } else {
       logger.info("Email credentials not set; skipping email verification");
     }
 
-    // Start Kafka Consumer
     await startNotificationConsumer();
-
     await flushNotificationOutbox();
 
     setInterval(() => {
@@ -55,7 +48,6 @@ async function startServer() {
     });
   } catch (error) {
     logger.error("Failed to start Notification Service", error);
-
     process.exit(1);
   }
 }

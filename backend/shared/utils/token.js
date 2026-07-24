@@ -3,13 +3,13 @@ const crypto = require("crypto");
 function base64UrlEncode(value) {
   return Buffer.from(value).toString("base64url");
 }
-
 function base64UrlDecode(value) {
   return Buffer.from(value, "base64url").toString("utf8");
 }
 
 function signToken(payload, secret, expiresInSeconds = 60 * 60 * 24) {
   const now = Math.floor(Date.now() / 1000);
+
   const header = {
     alg: "HS256",
     typ: "JWT",
@@ -23,6 +23,7 @@ function signToken(payload, secret, expiresInSeconds = 60 * 60 * 24) {
 
   const encodedHeader = base64UrlEncode(JSON.stringify(header));
   const encodedPayload = base64UrlEncode(JSON.stringify(tokenPayload));
+
   const signature = crypto
     .createHmac("sha256", secret)
     .update(`${encodedHeader}.${encodedPayload}`)
@@ -32,8 +33,9 @@ function signToken(payload, secret, expiresInSeconds = 60 * 60 * 24) {
 }
 
 function verifyToken(token, secret) {
-  const [encodedHeader, encodedPayload, signature] = String(token || "").split(".");
-
+  const [encodedHeader, encodedPayload, signature] = String(token || "").split(
+    ".",
+  );
   if (!encodedHeader || !encodedPayload || !signature) {
     throw new Error("Invalid token");
   }
@@ -42,7 +44,6 @@ function verifyToken(token, secret) {
     .createHmac("sha256", secret)
     .update(`${encodedHeader}.${encodedPayload}`)
     .digest("base64url");
-
   const expectedBuffer = Buffer.from(expectedSignature);
   const receivedBuffer = Buffer.from(signature);
 
@@ -50,10 +51,23 @@ function verifyToken(token, secret) {
     expectedBuffer.length !== receivedBuffer.length ||
     !crypto.timingSafeEqual(expectedBuffer, receivedBuffer)
   ) {
-    throw new Error("Invalid token");
+    throw new Error("Invalid token signature");
   }
 
-  const payload = JSON.parse(base64UrlDecode(encodedPayload));
+  let header;
+  let payload;
+
+  try {
+    header = JSON.parse(base64UrlDecode(encodedHeader));
+    payload = JSON.parse(base64UrlDecode(encodedPayload));
+  } catch {
+    throw new Error("Invalid token payload");
+  }
+
+  if (header.alg !== "HS256") {
+    throw new Error("Unsupported token algorithm");
+  }
+
   const now = Math.floor(Date.now() / 1000);
 
   if (payload.exp && payload.exp < now) {

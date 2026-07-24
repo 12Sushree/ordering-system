@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const productSchema = new mongoose.Schema(
   {
     productId: {
-      type: Number,
+      type: String,
       required: true,
       unique: true,
       index: true,
@@ -13,11 +13,24 @@ const productSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+      maxlength: 200,
+    },
+
+    description: {
+      type: String,
+      default: "",
+      trim: true,
     },
 
     category: {
       type: String,
       required: true,
+      trim: true,
+    },
+
+    brand: {
+      type: String,
+      default: "",
       trim: true,
     },
 
@@ -30,8 +43,14 @@ const productSchema = new mongoose.Schema(
     stock: {
       type: Number,
       required: true,
-      min: 0,
       default: 0,
+      min: 0,
+    },
+
+    thumbnail: {
+      type: String,
+      default: "",
+      trim: true,
     },
   },
   {
@@ -39,8 +58,8 @@ const productSchema = new mongoose.Schema(
   },
 );
 
-// Useful indexes
 productSchema.index({ title: 1 });
 productSchema.index({ category: 1 });
+productSchema.index({ brand: 1 });
 
 module.exports = mongoose.model("Product", productSchema);

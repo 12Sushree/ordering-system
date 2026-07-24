@@ -1,24 +1,30 @@
-const { sendSuccess, sendError } = require("../../../shared/utils/response");
+const { sendSuccess } = require("../../../shared/utils/response");
 const productService = require("../services/productService");
+
+function createHttpError(message, statusCode = 500) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+}
 
 async function syncProducts(req, res, next) {
   try {
     const result = await productService.syncProducts();
-
-    sendSuccess(res, {
+    return sendSuccess(res, {
       message: "Products synchronized successfully",
       data: result,
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 }
 
 async function getProducts(req, res, next) {
   try {
     const products = await productService.getProducts(req.query);
-
-    sendSuccess(res, { data: products });
+    return sendSuccess(res, {
+      data: products,
+    });
   } catch (error) {
     next(error);
   }
@@ -27,8 +33,9 @@ async function getProducts(req, res, next) {
 async function getPublicProducts(req, res, next) {
   try {
     const products = await productService.getPublicProducts(req.query);
-
-    sendSuccess(res, { data: products });
+    return sendSuccess(res, {
+      data: products,
+    });
   } catch (error) {
     next(error);
   }
@@ -36,13 +43,19 @@ async function getPublicProducts(req, res, next) {
 
 async function getProduct(req, res, next) {
   try {
-    const product = await productService.getProductById(req.params.id);
-
-    if (!product) {
-      return sendError(res, { statusCode: 404, message: "Product not found" });
+    const { id } = req.params;
+    if (!id) {
+      throw createHttpError("Product id required", 400);
     }
 
-    sendSuccess(res, { data: product });
+    const product = await productService.getProductById(id);
+    if (!product) {
+      throw createHttpError("Product not found", 404);
+    }
+
+    return sendSuccess(res, {
+      data: product,
+    });
   } catch (error) {
     next(error);
   }

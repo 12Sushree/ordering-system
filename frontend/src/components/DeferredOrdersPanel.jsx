@@ -13,7 +13,7 @@ function formatOrderLabel(order) {
 }
 
 function DeferredOrdersPanel({ orders }) {
-  const pendingOrders = orders.filter((order) => order.status === "PENDING");
+  const pendingOrders = orders.filter((order) => order.deferred === true);
 
   return (
     <Card elevation={4} sx={{ mb: 3 }}>

@@ -1,32 +1,38 @@
 import axios from "axios";
 
 const serviceClients = {
+  auth: axios.create({
+    baseURL: import.meta.env.VITE_AUTH_BASE,
+  }),
+
   order: axios.create({
-    baseURL: "http://localhost:5000",
+    baseURL: import.meta.env.VITE_ORDER_BASE,
   }),
+
   inventory: axios.create({
-    baseURL: "http://localhost:5001",
+    baseURL: import.meta.env.VITE_INVENTORY_BASE,
   }),
+
   notification: axios.create({
-    baseURL: "http://localhost:5002",
+    baseURL: import.meta.env.VITE_NOTIFICATION_BASE,
   }),
+
   analytics: axios.create({
-    baseURL: "http://localhost:5003",
+    baseURL: import.meta.env.VITE_ANALYTICS_BASE,
   }),
 };
 
 export const getServiceHealth = async (serviceName) => {
   const client = serviceClients[serviceName];
-
   if (!client) {
     throw new Error(`Unknown service: ${serviceName}`);
   }
 
-  const response = await client.get("/health");
+  const { data } = await client.get("/health");
 
   return {
     name: serviceName,
-    ok: Boolean(response.data?.success),
-    payload: response.data,
+    ok: Boolean(data?.success),
+    payload: data,
   };
 };

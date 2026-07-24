@@ -146,7 +146,7 @@ function OrdersTable({
 
                     <TableCell align="center">Qty</TableCell>
 
-                    <TableCell align="right">Total</TableCell>
+                    <TableCell align="center">Total</TableCell>
 
                     <TableCell align="center">Status</TableCell>
 
@@ -157,10 +157,7 @@ function OrdersTable({
                 <TableBody>
                   {visibleOrders.length === 0 ? (
                     <TableRow>
-                      <TableCell
-                        colSpan={showCustomer ? 7 : 6}
-                        align="center"
-                      >
+                      <TableCell colSpan={showCustomer ? 7 : 6} align="center">
                         No orders found
                       </TableCell>
                     </TableRow>
@@ -182,7 +179,10 @@ function OrdersTable({
                               {order.customerName}
                             </Typography>
 
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
                               {order.customerEmail}
                             </Typography>
                           </TableCell>
@@ -192,16 +192,11 @@ function OrdersTable({
                           <Typography fontWeight="bold">
                             {order.productTitle}
                           </Typography>
-
-                          <Typography variant="caption" color="text.secondary">
-                            {order.statusHistory?.[order.statusHistory.length - 1]?.note ||
-                              "Awaiting updates"}
-                          </Typography>
                         </TableCell>
 
                         <TableCell align="center">{order.quantity}</TableCell>
 
-                        <TableCell align="right">
+                        <TableCell align="center">
                           Rs. {Number(order.totalPrice).toLocaleString("en-IN")}
                         </TableCell>
 

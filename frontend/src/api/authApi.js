@@ -1,36 +1,41 @@
-import api from "./axios";
+import createApiClient from "./createApiClient";
+
+const authApi = createApiClient(import.meta.env.VITE_AUTH_API);
 
 export const login = async (payload) => {
-  const response = await api.post("/auth/login", payload);
-  return response.data.data;
+  const { data } = await authApi.post("/auth/login", payload);
+  return data.data;
 };
 
 export const register = async (payload) => {
-  const response = await api.post("/auth/register", payload);
-  return response.data.data;
+  const { data } = await authApi.post("/auth/register", payload);
+  return data.data;
 };
 
 export const registerAdmin = async (payload) => {
-  const response = await api.post("/auth/register/admin", payload);
-  return response.data.data;
+  const { data } = await authApi.post("/auth/register/admin", payload);
+  return data.data;
 };
 
 export const getMe = async () => {
-  const response = await api.get("/auth/me");
-  return response.data.data;
+  const { data } = await authApi.get("/auth/me");
+  return data.data;
 };
 
 export const getUsers = async (params = {}) => {
-  const response = await api.get("/auth/users", { params });
-  return response.data.data;
+  const { data } = await authApi.get("/auth/users", {
+    params,
+  });
+
+  return data.data;
 };
 
 export const requestPasswordReset = async (payload) => {
-  const response = await api.post("/auth/password/forgot", payload);
-  return response.data.data;
+  const { data } = await authApi.post("/auth/password/forgot", payload);
+  return data.data;
 };
 
 export const resetPassword = async (payload) => {
-  const response = await api.post("/auth/password/reset", payload);
-  return response.data.data;
+  const { data } = await authApi.post("/auth/password/reset", payload);
+  return data.data;
 };

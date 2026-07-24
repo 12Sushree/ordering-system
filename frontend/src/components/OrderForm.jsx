@@ -12,7 +12,10 @@ import {
 } from "@mui/material";
 
 function createRequestId() {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return crypto.randomUUID();
   }
 
@@ -37,7 +40,9 @@ function OrderForm({
 }) {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [clientRequestId, setClientRequestId] = useState(() => readPendingRequestId());
+  const [clientRequestId, setClientRequestId] = useState(() =>
+    readPendingRequestId(),
+  );
 
   const [formData, setFormData] = useState({
     productId: "",
@@ -156,7 +161,19 @@ function OrderForm({
             />
           </Grid>
 
-          <Grid size={{ xs: 12, md: 3 }}>
+          <Grid size={{ xs: 12, md: 2 }}>
+            <TextField
+              fullWidth
+              label="Unit Price"
+              value={`Rs. ${selectedProduct ? Number(selectedProduct.price).toLocaleString("en-IN") : "0"}`}
+              InputProps={{
+                readOnly: true,
+              }}
+              disabled={!selectedProduct}
+            />
+          </Grid>
+
+          <Grid size={{ xs: 12, md: 2 }}>
             <TextField
               fullWidth
               label="Total Price"
@@ -167,7 +184,10 @@ function OrderForm({
             />
           </Grid>
 
-          <Grid size={{ xs: 12, md: 3 }}>
+          <Grid
+            size={{ xs: 12, md: 2 }}
+            sx={{ display: "flex", alignItems: "stretch" }}
+          >
             <Button
               type="submit"
               variant="contained"

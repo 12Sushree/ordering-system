@@ -71,7 +71,6 @@ function validateAnalyticsEvent(event) {
 async function processAnalytics(event) {
   const { eventId, eventType, orderId, quantity, status, totalPrice } =
     validateAnalyticsEvent(event);
-
   logger.info(`Received Analytics Event :: ${eventId} :: Order=${orderId}`);
 
   const result = await runInTransaction(async (session) => {

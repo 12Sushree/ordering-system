@@ -307,7 +307,6 @@ async function processInventoryUpdate(event) {
       eventType,
       service: SERVICE_NAME,
     }).session(session);
-
     if (alreadyProcessed) {
       return {
         duplicate: true,
@@ -318,7 +317,6 @@ async function processInventoryUpdate(event) {
     if (!order) {
       throw createHttpError(`Order not found: ${orderId}`, 404);
     }
-
     if (order.status === status) {
       await ProcessedEvent.create(
         [

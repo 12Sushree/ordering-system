@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-
 import {
   Alert,
   Card,
@@ -20,14 +19,12 @@ import {
 
 function ProductTable({ products, serviceAvailable }) {
   const items = products?.items || [];
-
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(12);
 
   const filteredProducts = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
-
     if (!normalizedSearch) {
       return items;
     }
@@ -174,21 +171,17 @@ function ProductTable({ products, serviceAvailable }) {
                         }}
                       >
                         <TableCell>{product.productId}</TableCell>
-
                         <TableCell>
                           <Typography fontWeight="bold">
                             {product.title}
                           </Typography>
-
                           <Typography variant="caption" color="text.secondary">
                             {product.category}
                           </Typography>
                         </TableCell>
-
                         <TableCell align="right">
                           ₹ {Number(product.price).toLocaleString("en-IN")}
                         </TableCell>
-
                         <TableCell
                           align="center"
                           sx={{
@@ -203,7 +196,6 @@ function ProductTable({ products, serviceAvailable }) {
                         >
                           {product.stock}
                         </TableCell>
-
                         <TableCell align="center">
                           {getStockChip(product.stock)}
                         </TableCell>

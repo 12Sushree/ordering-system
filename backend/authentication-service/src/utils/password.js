@@ -22,7 +22,6 @@ function verifyPassword(password, storedHash) {
 
   const derivedKey = crypto.scryptSync(password, salt, KEY_LENGTH);
   const expectedKey = Buffer.from(hash, "hex");
-
   if (expectedKey.length !== derivedKey.length) {
     return false;
   }

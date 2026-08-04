@@ -37,24 +37,19 @@ const SERVICE_KEYS = ["order", "inventory", "notification", "analytics"];
 function Dashboard() {
   const { user, isAdmin, isSuperAdmin, logout } = useAuth();
   const { replace } = useRouter();
-
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [inventory, setInventory] = useState({ items: [] });
   const [analytics, setAnalytics] = useState({});
-
   const [loading, setLoading] = useState(true);
   const [orderDataReady, setOrderDataReady] = useState(true);
-  // eslint-disable-next-line
   const [healthChecked, setHealthChecked] = useState(false);
-
   const [serviceHealth, setServiceHealth] = useState({
     order: true,
     inventory: true,
     notification: true,
     analytics: true,
   });
-
   const [superUsers, setSuperUsers] = useState({
     items: [],
     page: 1,
@@ -112,12 +107,10 @@ function Dashboard() {
           result.status === "rejected" &&
           result.reason?.response?.status === 401,
       );
-
       if (unauthorizedResult) {
         if (showLoader) {
           setLoading(false);
         }
-
         handleUnauthorized();
         return;
       }
@@ -131,7 +124,7 @@ function Dashboard() {
             ? nextProducts.value?.items || nextProducts.value || []
             : [],
         );
-        // eslint-disable-next-line
+
         const nextOrders = results[resultIndex++];
         setOrders(
           nextOrders.status === "fulfilled"
@@ -157,7 +150,6 @@ function Dashboard() {
         setOrderDataReady(nextOrders.status === "fulfilled");
 
         const nextInventory = results[resultIndex++];
-        // eslint-disable-next-line
         const nextAnalytics = results[resultIndex++];
 
         setInventory(
@@ -174,7 +166,6 @@ function Dashboard() {
         setLoading(false);
       }
     },
-    // eslint-disable-next-line
     [isAdmin],
   );
 
@@ -225,10 +216,8 @@ function Dashboard() {
     const nextHealth = SERVICE_KEYS.reduce(
       (accumulator, serviceName, index) => {
         const result = results[index];
-
         if (result.status === "fulfilled") {
           const response = result.value;
-
           accumulator[serviceName] =
             response?.ok ??
             response?.data?.ok ??
@@ -243,7 +232,6 @@ function Dashboard() {
     );
 
     setServiceHealth(nextHealth);
-
     setHealthChecked(true);
   }, []);
 
@@ -288,7 +276,6 @@ function Dashboard() {
       loadSuperAdminData(true);
       return;
     }
-
     loadDashboard(true);
     refreshHealth();
   }, [isSuperAdmin, loadDashboard, loadSuperAdminData, refreshHealth]);
@@ -299,7 +286,6 @@ function Dashboard() {
         loadSuperAdminData(false);
         return;
       }
-
       loadDashboard(false);
       refreshHealth();
     }, 5000);
@@ -505,7 +491,6 @@ function Dashboard() {
                 total={superUsers.total}
                 onPageChange={(page, limit) => {
                   const nextLimit = limit || superUsersLimit;
-
                   setSuperUsersPage(page);
                   setSuperUsersLimit(nextLimit);
                   loadSuperAdminData(false, {

@@ -8,7 +8,6 @@ async function syncProducts() {
     });
 
     const products = response.data.products || [];
-
     if (!products.length) {
       return {
         totalProducts: 0,
@@ -50,7 +49,6 @@ function buildProductQuery({ search = "" } = {}) {
   const query = {};
 
   const normalizedSearch = String(search).trim();
-
   if (normalizedSearch) {
     query.$or = [
       {
@@ -86,7 +84,6 @@ function buildProductQuery({ search = "" } = {}) {
 async function getProducts(filters = {}) {
   const page = Math.max(Number(filters.page) || 1, 1);
   const limit = Math.min(Math.max(Number(filters.limit) || 12, 1), 100);
-
   const query = buildProductQuery(filters);
 
   const [items, total] = await Promise.all([
@@ -95,7 +92,6 @@ async function getProducts(filters = {}) {
       .skip((page - 1) * limit)
       .limit(limit)
       .lean(),
-
     Product.countDocuments(query),
   ]);
 
@@ -111,7 +107,6 @@ async function getProducts(filters = {}) {
 async function getPublicProducts(filters = {}) {
   const page = Math.max(Number(filters.page) || 1, 1);
   const limit = Math.min(Math.max(Number(filters.limit) || 100, 1), 100);
-
   const query = buildProductQuery(filters);
 
   const [items, total] = await Promise.all([
@@ -121,7 +116,6 @@ async function getPublicProducts(filters = {}) {
       .skip((page - 1) * limit)
       .limit(limit)
       .lean(),
-
     Product.countDocuments(query),
   ]);
 
@@ -135,9 +129,7 @@ async function getPublicProducts(filters = {}) {
 }
 
 async function getProductById(id) {
-  return Product.findOne({
-    productId: String(id),
-  })
+  return Product.findOne({ productId: String(id) })
     .select("productId title category price stock")
     .lean();
 }

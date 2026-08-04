@@ -177,7 +177,6 @@ async function processNotification(event) {
       eventType,
       service: SERVICE_NAME,
     }).session(session);
-
     if (alreadyProcessed) {
       return {
         duplicate: true,

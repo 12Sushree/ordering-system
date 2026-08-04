@@ -203,7 +203,6 @@ async function updateUserRole({ userId, role }, actor = null) {
     error.statusCode = 404;
     throw error;
   }
-
   if (targetUser.isSuperAdmin) {
     const error = new Error("Super Admin role cannot be changed");
     error.statusCode = 400;
@@ -272,7 +271,6 @@ async function resetPassword({ token, password, confirmPassword }) {
     error.statusCode = 400;
     throw error;
   }
-
   if (password !== confirmPassword) {
     const error = new Error("Passwords do not match");
     error.statusCode = 400;
@@ -288,7 +286,6 @@ async function resetPassword({ token, password, confirmPassword }) {
       $gt: new Date(),
     },
   }).populate("userId");
-
   if (!resetRecord) {
     const error = new Error("Reset token is invalid or expired");
     error.statusCode = 400;

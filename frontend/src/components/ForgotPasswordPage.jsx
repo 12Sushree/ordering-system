@@ -1,5 +1,4 @@
 import { useState } from "react";
-
 import {
   Alert,
   Box,
@@ -11,7 +10,6 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-
 import { requestPasswordReset, resetPassword } from "../api/authApi";
 import { useRouter } from "../context/RouterContext";
 import PasswordField from "./PasswordField";
@@ -37,17 +35,17 @@ function ForgotPasswordPage() {
 
     try {
       const result = await requestPasswordReset({ email });
-
       if (!result?.resetToken) {
         setError("No account found with that email address.");
         return;
       }
-
       setResetToken(result.resetToken);
       setStep("reset");
       setMessage("Account found. Set a new password below.");
     } catch (err) {
-      setError(err?.response?.data?.message || "Unable to request password reset");
+      setError(
+        err?.response?.data?.message || "Unable to request password reset",
+      );
     } finally {
       setLoading(false);
     }
@@ -107,8 +105,8 @@ function ForgotPasswordPage() {
             </Typography>
 
             <Typography variant="body2" sx={{ mb: 3, color: "text.secondary" }}>
-              Enter your email first. If the account exists, we will let you set a new
-              password.
+              Enter your email first. If the account exists, we will let you set
+              a new password.
             </Typography>
 
             {error && (

@@ -7,7 +7,6 @@ import {
   Toolbar,
   Typography,
 } from "@mui/material";
-
 import { useAuth } from "../context/AuthContext";
 
 function Navbar() {

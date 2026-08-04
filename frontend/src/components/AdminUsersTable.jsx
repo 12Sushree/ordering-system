@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-
 import {
   Alert,
   Card,
@@ -27,7 +26,6 @@ function AdminUsersTable({ users, serviceAvailable }) {
 
   const filteredUsers = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
-
     if (!normalizedSearch) {
       return items;
     }
@@ -42,7 +40,6 @@ function AdminUsersTable({ users, serviceAvailable }) {
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
-
       return haystack.includes(normalizedSearch);
     });
   }, [items, search]);
@@ -140,7 +137,6 @@ function AdminUsersTable({ users, serviceAvailable }) {
                             <Typography fontWeight="bold">
                               {user.name}
                             </Typography>
-
                             {user.isSuperAdmin && (
                               <Chip
                                 label="Super Admin"
@@ -150,11 +146,8 @@ function AdminUsersTable({ users, serviceAvailable }) {
                               />
                             )}
                           </TableCell>
-
                           <TableCell>{user.email}</TableCell>
-
                           <TableCell>{user.role}</TableCell>
-
                           <TableCell>
                             {new Date(user.createdAt).toLocaleDateString(
                               "en-IN",

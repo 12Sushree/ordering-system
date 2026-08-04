@@ -1,5 +1,4 @@
 import { useId, useState } from "react";
-
 import {
   FormControl,
   IconButton,
@@ -12,13 +11,7 @@ import VisibilityOff from "@mui/icons-material/VisibilityOff";
 
 function PasswordField(props) {
   const [showPassword, setShowPassword] = useState(false);
-  const {
-    id: idProp,
-    label,
-    fullWidth = false,
-    sx,
-    ...rest
-  } = props;
+  const { id: idProp, label, fullWidth = false, sx, ...rest } = props;
   const generatedId = useId();
   const id = idProp || generatedId;
 

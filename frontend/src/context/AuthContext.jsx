@@ -1,5 +1,4 @@
 import { createContext, useContext, useEffect, useState } from "react";
-
 import { getMe, login as loginRequest } from "../api/authApi";
 import ROLES from "../constants/roles";
 
@@ -31,7 +30,6 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const hydrateSession = async () => {
       const stored = readStoredSession();
-
       if (!stored.token) {
         setLoading(false);
         return;
@@ -41,14 +39,11 @@ export function AuthProvider({ children }) {
 
       try {
         const me = await getMe();
-
         setUser(me);
-
         localStorage.setItem("authUser", JSON.stringify(me));
       } catch {
         localStorage.removeItem("authToken");
         localStorage.removeItem("authUser");
-
         setUser(null);
         setToken(null);
       } finally {
@@ -95,10 +90,8 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-
   if (!context) {
     throw new Error("useAuth must be used within AuthProvider");
   }
-
   return context;
 }

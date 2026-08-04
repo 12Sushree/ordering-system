@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-
 import {
   Alert,
   Box,
@@ -11,7 +10,6 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-
 import { useAuth } from "../context/AuthContext";
 import { useRouter } from "../context/RouterContext";
 import PasswordField from "./PasswordField";
@@ -22,7 +20,6 @@ function readFlashMessage() {
   }
 
   const message = sessionStorage.getItem("authFlash") || "";
-
   if (message) {
     sessionStorage.removeItem("authFlash");
   }
@@ -47,7 +44,6 @@ function LoginPage() {
     }
 
     const savedEmail = sessionStorage.getItem("pendingLoginEmail");
-
     if (savedEmail) {
       setFormData((prev) => ({
         ...prev,

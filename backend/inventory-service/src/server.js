@@ -37,6 +37,7 @@ async function safeFlushOutbox() {
     return;
   }
   flushing = true;
+
   try {
     await flushInventoryOutbox();
   } catch (error) {

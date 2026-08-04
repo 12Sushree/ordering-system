@@ -63,7 +63,6 @@ function OrdersTable({
 
   const filteredOrders = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
-
     if (!normalizedSearch) {
       return orders || [];
     }
@@ -139,17 +138,11 @@ function OrdersTable({
                 >
                   <TableRow>
                     <TableCell>Order ID</TableCell>
-
                     {showCustomer && <TableCell>Customer</TableCell>}
-
                     <TableCell>Product</TableCell>
-
                     <TableCell align="center">Qty</TableCell>
-
                     <TableCell align="center">Total</TableCell>
-
                     <TableCell align="center">Status</TableCell>
-
                     <TableCell>Date</TableCell>
                   </TableRow>
                 </TableHead>
@@ -172,13 +165,11 @@ function OrdersTable({
                         }}
                       >
                         <TableCell>{order._id.slice(-8)}</TableCell>
-
                         {showCustomer && (
                           <TableCell>
                             <Typography fontWeight="bold">
                               {order.customerName}
                             </Typography>
-
                             <Typography
                               variant="caption"
                               color="text.secondary"
@@ -187,23 +178,18 @@ function OrdersTable({
                             </Typography>
                           </TableCell>
                         )}
-
                         <TableCell>
                           <Typography fontWeight="bold">
                             {order.productTitle}
                           </Typography>
                         </TableCell>
-
                         <TableCell align="center">{order.quantity}</TableCell>
-
                         <TableCell align="center">
                           Rs. {Number(order.totalPrice).toLocaleString("en-IN")}
                         </TableCell>
-
                         <TableCell align="center">
                           {getStatusChip(order.status)}
                         </TableCell>
-
                         <TableCell>
                           {new Date(order.createdAt).toLocaleString("en-IN")}
                         </TableCell>

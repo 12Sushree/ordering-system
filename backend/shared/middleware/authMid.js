@@ -4,11 +4,9 @@ const { verifyToken } = require("../utils/token");
 function getTokenFromHeader(req) {
   const header = req.headers.authorization || "";
   const [scheme, token] = header.split(" ");
-
   if (scheme !== "Bearer" || !token) {
     return null;
   }
-
   return token;
 }
 

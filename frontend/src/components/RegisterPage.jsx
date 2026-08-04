@@ -1,5 +1,4 @@
 import { useState } from "react";
-
 import {
   Alert,
   Box,
@@ -11,7 +10,6 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-
 import { register as registerRequest } from "../api/authApi";
 import { useRouter } from "../context/RouterContext";
 import PasswordField from "./PasswordField";

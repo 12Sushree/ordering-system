@@ -10,9 +10,7 @@ const app = express();
 
 app.use(helmet());
 
-// Health endpoint should be publicly accessible
 app.use("/health", cors());
-
 app.use(
   cors({
     origin: process.env.CLIENT_URL || "*",

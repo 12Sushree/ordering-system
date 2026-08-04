@@ -7,16 +7,13 @@ const errorHandler = require("../../shared/middleware/errorMid");
 
 const app = express();
 
-// Health endpoint should be publicly accessible
 app.use("/health", cors());
-
 app.use(
   cors({
     origin: process.env.CLIENT_URL,
     credentials: true,
   }),
 );
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

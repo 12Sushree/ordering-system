@@ -6,7 +6,6 @@ import {
   createTheme,
 } from "@mui/material";
 import { useEffect } from "react";
-
 import { useAuth } from "./context/AuthContext";
 import { useRouter } from "./context/RouterContext";
 import Dashboard from "./pages/Dashboard";
@@ -48,9 +47,7 @@ function App() {
     pathname === "/forgot-password" ||
     pathname === "/reset-password";
   const isDashboardRoute = pathname === "/dashboard";
-  const routeReady = isAuthenticated
-    ? isDashboardRoute
-    : isAuthRoute;
+  const routeReady = isAuthenticated ? isDashboardRoute : isAuthRoute;
 
   useEffect(() => {
     if (loading) {
@@ -104,7 +101,8 @@ function App() {
       ) : !isAuthenticated ? (
         pathname === "/register" ? (
           <RegisterPage />
-        ) : pathname === "/forgot-password" || pathname === "/reset-password" ? (
+        ) : pathname === "/forgot-password" ||
+          pathname === "/reset-password" ? (
           <ForgotPasswordPage />
         ) : (
           <LoginPage />

@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-
 import {
   Alert,
   Autocomplete,
@@ -26,7 +25,6 @@ function readPendingRequestId() {
   if (typeof sessionStorage === "undefined") {
     return createRequestId();
   }
-
   return sessionStorage.getItem("pendingOrderRequestId") || createRequestId();
 }
 
@@ -43,7 +41,6 @@ function OrderForm({
   const [clientRequestId, setClientRequestId] = useState(() =>
     readPendingRequestId(),
   );
-
   const [formData, setFormData] = useState({
     productId: "",
     quantity: 1,
@@ -58,7 +55,6 @@ function OrderForm({
 
   const totalPrice = useMemo(() => {
     if (!selectedProduct) return 0;
-
     return Number(selectedProduct.price) * Number(formData.quantity || 0);
   }, [selectedProduct, formData.quantity]);
 
@@ -70,6 +66,7 @@ function OrderForm({
     }
 
     setSubmitting(true);
+
     if (typeof sessionStorage !== "undefined") {
       sessionStorage.setItem("pendingOrderRequestId", clientRequestId);
     }
@@ -85,7 +82,6 @@ function OrderForm({
         productId: "",
         quantity: 1,
       });
-
       setSelectedProduct(null);
       if (typeof sessionStorage !== "undefined") {
         sessionStorage.removeItem("pendingOrderRequestId");
